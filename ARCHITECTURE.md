@@ -4,6 +4,16 @@ No reference UI repo was supplied for this build (see `CLAUDE.md` → Build note
 
 **Revision note:** the kickoff now names the ambient overlay (bubble + panel) as the flagship surface, reached through four sanctioned entry points ("doors"), not an excluded feature. This revises the Phase 0 docs written earlier this session, which had explicitly ruled the floating overlay out — see the "four doors" section below and `SCOPE.md`.
 
+## Decisions
+
+Settled calls, recorded so they don't get silently re-litigated:
+
+| Decision | Call | Rationale |
+|---|---|---|
+| AGP 9 migration | **Deferred** to between Phase 1 and Phase 2 | Requires dropping `org.jetbrains.kotlin.android` for AGP's built-in Kotlin support — a build-foundation rewrite Hilt and KSP both sit on top of. Not worth debugging before a single screen exists; Phase 1 screens ship with full `@Preview` coverage per state regardless, so the eventual migration to Compose Preview Screenshot Testing is additive, not a redo. |
+| `minSdk` | **26**, keep | Forced by `TYPE_APPLICATION_OVERLAY`, which Door 3's bubble needs and which itself requires API 26 — not an arbitrary floor. |
+| `android:allowBackup` | **`false`** | The Room DB is a private personal archive; free device-swap continuity isn't worth it riding along in the user's Google account backup by default. Revisit only if the app ships an explicit, encrypted export path. |
+
 ## Package structure
 
 ```
@@ -13,7 +23,7 @@ com.zackwhye.secondbrain
 │
 ├── core/
 │   ├── designsystem/                 # tokens from DESIGN.md: Color.kt, Type.kt, Shape.kt, Motion.kt, Theme.kt, components/ (Card, Chip, SectionHeader, BriefBlock, ChatBubble, Bubble, Panel, NavBar)
-│   ├── database/                     # Room only: AppDatabase.kt, entity/, dao/ — no business logic
+│   ├── database/                     # Room only: AppDatabase.kt, entity/ — no business logic. dao/ lands in Phase 1 alongside the screens/repositories that need it
 │   ├── network/                      # Supabase client (Postgrest/Storage/Realtime), DTOs, mappers entity<->dto
 │   ├── data/                         # repositories: single source of truth, composes database + network
 │   │   ├── ItemRepository.kt
