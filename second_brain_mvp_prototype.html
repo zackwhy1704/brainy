@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Second Brain — MVP Prototype</title>
+<style>
+:root{--bg:#eef0f4;--phone:#0b0c10;--screen:#f8f8fb;--ink:#15161a;--muted:#777a83;--card:#fff;--line:#e7e7ec;--accent:#6d4aff;--accent2:#8d78ff;--green:#21a366;--shadow:0 20px 60px #0002}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#ece8ff,#f5f5f6);font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;color:var(--ink)}
+.wrap{max-width:1500px;margin:auto;padding:40px}.hero{display:flex;justify-content:space-between;gap:30px;align-items:end;margin-bottom:30px}.hero h1{font-size:42px;margin:0 0 8px}.hero p{color:#666;max-width:720px;font-size:17px;line-height:1.5}.badge{padding:10px 14px;border:1px solid #ddd;border-radius:999px;background:#fff;font-size:13px}
+.phones{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start;justify-content:center}.device{width:375px;background:#090a0d;border-radius:46px;padding:10px;box-shadow:var(--shadow);position:relative}.device.android{border-radius:34px}.screen{height:760px;border-radius:37px;background:var(--screen);overflow:hidden;position:relative}.android .screen{border-radius:25px}.island{position:absolute;z-index:5;top:10px;left:50%;transform:translateX(-50%);width:105px;height:27px;background:#090a0d;border-radius:20px}.status{height:42px;padding:13px 18px 0;font-size:12px;display:flex;justify-content:space-between}.appbar{padding:12px 20px 8px;display:flex;justify-content:space-between;align-items:center}.title{font-size:28px;font-weight:750}.icon{width:38px;height:38px;border-radius:13px;background:#eeeafc;display:grid;place-items:center;color:var(--accent);font-weight:bold}.search{margin:8px 18px 14px;background:#ececf1;border-radius:15px;padding:11px 14px;color:#8b8c94;font-size:14px}.scroll{padding:0 18px 90px;overflow:auto;height:620px}.section{font-size:12px;color:#8a8b93;text-transform:uppercase;letter-spacing:.08em;margin:18px 2px 9px}.card{background:var(--card);border:1px solid var(--line);border-radius:19px;padding:15px;margin-bottom:11px;box-shadow:0 4px 16px #00000008}.row{display:flex;gap:11px;align-items:center}.dot{width:35px;height:35px;border-radius:12px;background:#eeeaff;display:grid;place-items:center;color:var(--accent)}.card h3{font-size:15px;margin:0 0 5px}.card p{font-size:13px;color:#777;line-height:1.4;margin:0}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}.chip{font-size:11px;background:#f0eff5;border-radius:999px;padding:6px 9px}.nav{position:absolute;bottom:0;left:0;right:0;height:72px;background:#fffdd;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding-top:12px}.nav div{font-size:10px;color:#777;text-align:center}.nav b{display:block;font-size:19px;color:#222;margin-bottom:2px}.nav .active,.nav .active b{color:var(--accent)}
+.fab{position:absolute;right:20px;bottom:83px;width:59px;height:59px;border-radius:20px;background:var(--accent);color:white;display:grid;place-items:center;font-size:27px;box-shadow:0 12px 25px #6d4aff55}.overlay{position:absolute;left:14px;right:14px;bottom:78px;background:#fff;border:1px solid #ddd;border-radius:24px;padding:15px;box-shadow:0 20px 45px #0003;z-index:4}.overlay .mini{font-size:11px;color:#777}.overlay h2{font-size:17px;margin:5px 0}.overlay p{font-size:12px;line-height:1.45;color:#555}.actions{display:flex;gap:7px}.btn{border:0;border-radius:12px;padding:9px 10px;font-size:11px;background:#f0eff6}.btn.primary{background:var(--accent);color:#fff}
+.detail{padding:8px 18px 90px}.back{color:var(--accent);font-size:13px;margin:7px 0 18px}.bigtitle{font-size:27px;font-weight:780;margin-bottom:8px}.meta{color:#85868e;font-size:12px;margin-bottom:15px}.insight{background:#eeeaff;border-radius:18px;padding:14px;margin:12px 0}.insight b{font-size:12px;color:var(--accent)}.insight p{font-size:13px;line-height:1.5;margin:7px 0 0}.line{height:1px;background:var(--line);margin:17px 0}.task{display:flex;gap:10px;padding:10px 0}.check{width:20px;height:20px;border:1.5px solid #bbb;border-radius:6px}.floatbubble{position:absolute;right:17px;top:155px;width:55px;height:55px;border-radius:20px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:bold;box-shadow:0 12px 30px #0004;z-index:8}.chat{padding:8px 18px 100px}.msg{max-width:88%;padding:12px 14px;border-radius:18px;margin:9px 0;font-size:13px;line-height:1.45}.ai{background:#eeeaff}.me{background:#17181d;color:#fff;margin-left:auto}.input{position:absolute;bottom:14px;left:15px;right:15px;background:#fff;border:1px solid #ddd;border-radius:18px;padding:12px;color:#999;font-size:13px}
+.spec{margin-top:45px;background:#fff;border:1px solid #ddd;border-radius:25px;padding:30px}.spec h2{margin-top:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}.spec .box{border:1px solid #e3e3e8;border-radius:18px;padding:18px}.spec h3{margin-top:0}.spec li{margin:7px 0;color:#555;line-height:1.4}.code{background:#101116;color:#e8e8ee;padding:18px;border-radius:15px;overflow:auto;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(max-width:600px){.wrap{padding:20px}.hero h1{font-size:31px}.device{width:350px}.screen{height:700px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section class="hero">
+<div><h1>Second Brain</h1><p>Mobile intelligence layer MVP — Capture anything → Understand → Remember → Connect → Act. Android is the ambient-agent flagship; iOS uses Share Sheet, App Intents, Shortcuts and native on-device intelligence.</p></div>
+<div class="badge">MVP prototype • iOS + Android</div>
+</section>
+
+<div class="phones">
+<!-- iOS home -->
+<div class="device ios"><div class="screen"><div class="island"></div><div class="status"><span>9:41</span><span>● ● ▰</span></div>
+<div class="appbar"><div class="title">Second Brain</div><div class="icon">✦</div></div>
+<div class="search">⌕  Ask your second brain...</div>
+<div class="scroll">
+<div class="section">Today</div>
+<div class="card"><div class="row"><div class="dot">▶</div><div><h3>AI accounting video</h3><p>Captured from YouTube • 4 min ago</p></div></div><div class="chips"><span class="chip">AI Accounting</span><span class="chip">New insight</span></div></div>
+<div class="card"><div class="row"><div class="dot">▣</div><div><h3>Customer conversation</h3><p>3 decisions • 2 open questions • 4 tasks</p></div></div><div class="chips"><span class="chip">Product</span><span class="chip">High priority</span></div></div>
+<div class="section">Your intelligence</div>
+<div class="card"><h3>What changed?</h3><p>Two new sources suggest reconciliation is a stronger customer pain point than your current MVP assumption.</p></div>
+<div class="card"><h3>Open loops</h3><p>5 tasks across 3 projects need attention.</p></div>
+<div class="section">Projects</div>
+<div class="card"><h3>AI Accounting</h3><p>18 sources • 6 insights • 3 open decisions</p></div>
+<div class="card"><h3>Apalchi</h3><p>11 sources • 4 insights • 2 open tasks</p></div>
+</div>
+<div class="fab">＋</div><div class="nav"><div class="active"><b>⌂</b>Home</div><div><b>◉</b>Inbox</div><div><b>⌁</b>Ask</div><div><b>●</b>Projects</div></div>
+</div></div>
+
+<!-- Android ambient -->
+<div class="device android"><div class="screen"><div class="status"><span>7:24</span><span>5G ◉ ▰</span></div>
+<div style="padding:20px;background:#202124;color:white;height:100%;"><div style="font-size:14px;color:#aaa">YouTube</div><div style="height:270px;margin-top:15px;background:linear-gradient(135deg,#34363b,#17181b);border-radius:18px;display:grid;place-items:center;font-size:45px">▶</div><h2 style="font-size:18px;margin-top:20px">The Future of AI Accounting</h2><p style="color:#aaa;font-size:13px">A long-form discussion about automated reconciliation...</p></div>
+<div class="floatbubble">✦</div>
+<div class="overlay"><div class="mini">SECOND BRAIN • CONTEXT</div><h2>What should I know?</h2><p><b>3 key ideas</b> extracted. This connects to your <b>AI Accounting</b> project and conflicts with one earlier assumption.</p><div class="actions"><button class="btn">Summarize</button><button class="btn">Connect</button><button class="btn primary">Save insight</button></div></div>
+</div></div>
+
+<!-- knowledge detail -->
+<div class="device ios"><div class="screen"><div class="island"></div><div class="status"><span>9:41</span><span>● ● ▰</span></div>
+<div class="detail"><div class="back">‹ AI Accounting</div><div class="bigtitle">AI Accounting</div><div class="meta">18 sources • updated today</div>
+<div class="insight"><b>NEW INSIGHT</b><p>Reconciliation appears repeatedly as a high-value automation opportunity across 4 independent sources.</p></div>
+<div class="section">Evidence</div>
+<div class="card"><h3>▶ YouTube — AI Accounting</h3><p>“Reconciliation is becoming the primary automation opportunity.”</p></div>
+<div class="card"><h3>◉ Customer conversation</h3><p>Customer described manual reconciliation as the largest weekly time sink.</p></div>
+<div class="section">Open decisions</div>
+<div class="task"><div class="check"></div><div><b>Should reconciliation move into MVP?</b><div class="meta">Conflicts with current roadmap</div></div></div>
+<div class="section">Suggested actions</div>
+<div class="actions"><button class="btn primary">Create task</button><button class="btn">Discuss</button></div>
+</div><div class="nav"><div><b>⌂</b>Home</div><div><b>◉</b>Inbox</div><div><b>⌁</b>Ask</div><div class="active"><b>●</b>Projects</div></div>
+</div></div>
+
+<!-- Ask -->
+<div class="device android"><div class="screen"><div class="status"><span>7:24</span><span>5G ◉ ▰</span></div><div class="appbar"><div class="title">Ask</div><div class="icon">✦</div></div>
+<div class="chat">
+<div class="msg me">What have I learned about AI accounting, and what am I missing?</div>
+<div class="msg ai"><b>Across 18 sources:</b><br><br>1. Reconciliation is the strongest recurring pain point.<br>2. SMEs prefer automation on top of existing systems.<br>3. Trust and explainability appear in multiple conversations.<br><br><b>What you're missing:</b> you have strong evidence for reconciliation, but only one source on willingness to pay.</div>
+<div class="msg me">Create a task to validate willingness to pay tomorrow.</div>
+<div class="msg ai">Done. I can also add a reminder or calendar slot if you want.</div>
+</div><div class="input">Ask anything about your memory…  ➤</div></div></div>
+</div>
+
+<section class="spec">
+<h2>End-to-end MVP technical specification</h2>
+<div class="grid">
+<div class="box"><h3>Product scope</h3><ul><li>Capture via Share Sheet / Android share intent.</li><li>URL, text, image, screenshot, PDF and voice ingestion.</li><li>AI Brief: summary, entities, topics, tasks, decisions, importance.</li><li>Automatic project/topic assignment.</li><li>Semantic Ask over personal memory.</li><li>Evidence-backed insights and source links.</li><li>Calendar/task actions first; broader MCP later.</li></ul></div>
+<div class="box"><h3>Android flagship</h3><ul><li>Kotlin + Jetpack Compose.</li><li>Hilt + Coroutines + Room.</li><li>Share Intent for primary ingestion.</li><li>Optional foreground overlay/floating bubble with explicit permission.</li><li>MediaProjection only for explicit screen capture workflows.</li><li>Gemini Nano/AICore where device/API availability supports it.</li><li>FCM for background sync and insight notifications.</li></ul></div>
+<div class="box"><h3>iOS</h3><ul><li>Swift + SwiftUI.</li><li>Share Extension for URLs, text, images and files.</li><li>App Intents for actions and Siri/Shortcuts integration.</li><li>WidgetKit for “What changed?” and open loops.</li><li>Foundation Models where supported for local summarization/extraction.</li><li>BackgroundTasks for bounded background processing.</li><li>No assumption of arbitrary cross-app screen access or floating overlay.</li></ul></div>
+<div class="box"><h3>Backend</h3><ul><li>API: Kotlin/Ktor or TypeScript/NestJS.</li><li>PostgreSQL as system of record.</li><li>pgvector for semantic retrieval in MVP.</li><li>Redis for queues/cache/rate limits.</li><li>S3-compatible object storage for files/audio.</li><li>Worker service for ingestion → extraction → embedding → memory updates.</li><li>LLM gateway supporting cloud models plus platform-local results.</li></ul></div>
+<div class="box"><h3>Core data model</h3><ul><li>User</li><li>Source / Capture</li><li>Content / Chunk</li><li>Entity</li><li>Topic</li><li>Project</li><li>Insight</li><li>Decision</li><li>Task</li><li>Event</li><li>Embedding</li><li>Agent Action / Tool Call</li></ul></div>
+<div class="box"><h3>Privacy architecture</h3><ul><li>Encrypt data in transit and at rest.</li><li>Device-local processing whenever practical.</li><li>Explicit consent before cloud processing.</li><li>Per-source delete/export.</li><li>Keep raw content separate from derived memory.</li><li>Audit every external action.</li><li>Never design around covert scraping of other apps.</li></ul></div>
+</div>
+
+<h2>Processing pipeline</h2>
+<div class="code">Capture
+  ↓
+Normalize (URL/text/image/audio/PDF)
+  ↓
+Content extraction / OCR / transcription
+  ↓
+AI extraction
+  ├── summary
+  ├── entities
+  ├── topics
+  ├── tasks
+  ├── decisions
+  ├── claims
+  └── importance
+  ↓
+Embedding + entity resolution
+  ↓
+Memory linker
+  ├── existing project?
+  ├── existing person?
+  ├── related sources?
+  ├── contradiction?
+  └── new insight?
+  ↓
+PostgreSQL + pgvector
+  ↓
+Retrieval / RAG
+  ↓
+Agent
+  ├── answer
+  ├── create task
+  ├── calendar event
+  └── notify user</div>
+
+<h2>Recommended infrastructure</h2>
+<div class="code">                    ┌─────────────────────┐
+ iOS Share Extension ─►│                     │
+ Android Share Intent ─►│      API Gateway    │
+ Floating Agent ───────►│                     │
+                    └──────────┬──────────┘
+                               │
+                 ┌─────────────┴─────────────┐
+                 │                           │
+             PostgreSQL                  Redis
+             + pgvector                  Queue/Cache
+                 │                           │
+                 └─────────────┬─────────────┘
+                               │
+                         Worker Cluster
+                               │
+          ┌────────────────────┼───────────────────┐
+          │                    │                   │
+       Extractor            Embedder          Memory Linker
+          │                    │                   │
+          └────────────────────┼───────────────────┘
+                               │
+                         Object Storage
+                       PDFs / images / audio
+                               │
+                    ┌──────────┴──────────┐
+                    │                     │
+             Local model result      Cloud LLM
+             Apple / Gemini Nano     complex reasoning
+                    │                     │
+                    └──────────┬──────────┘
+                               │
+                         Agent Tool Bus
+                               │
+                 Calendar / Tasks / Future MCP</div>
+
+<h2>Suggested MVP stack</h2>
+<div class="grid">
+<div class="box"><h3>Mobile</h3><b>Android:</b> Kotlin, Compose, Hilt, Coroutines, Room, Retrofit/OkHttp<br/><br/><b>iOS:</b> Swift, SwiftUI, App Intents, Share Extension, WidgetKit, Foundation Models</div>
+<div class="box"><h3>Backend</h3><b>Kotlin/Ktor</b> if maximizing reuse of existing Kotlin expertise; otherwise TypeScript/NestJS. PostgreSQL + pgvector, Redis, S3-compatible storage, Docker.</div>
+<div class="box"><h3>AI</h3><b>On-device:</b> Apple Foundation Models / Gemini Nano when available.<br/><b>Cloud:</b> model gateway with structured JSON outputs. Use smaller models for extraction and larger models only for synthesis/reasoning.</div>
+<div class="box"><h3>Deployment</h3>Start with one cloud region, managed PostgreSQL, managed Redis, object storage and containerized API/worker services. Avoid Kubernetes until scale requires it. Add observability from day one.</div>
+</div>
+
+<h2>MVP boundary</h2>
+<p><b>Build:</b> capture, AI brief, automatic organization, semantic memory, Ask, evidence, projects, tasks and calendar actions, Android floating experience, iOS Share/App Intents.</p>
+<p><b>Do not build yet:</b> direct WhatsApp/WeChat/Telegram scraping, autonomous control of arbitrary apps, full MCP marketplace, enterprise Slack connectors, always-on recording, custom foundation model, full knowledge graph UI, multi-agent orchestration.</p>
+<p><b>North-star test:</b> after 30 days, a user should be able to capture something from any app, forget about it, and later ask the Second Brain a question whose answer depends on that captured information plus their accumulated context.</p>
+</section>
+</div>
+</body>
+</html>
