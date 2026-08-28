@@ -13,7 +13,7 @@ com.zackwhye.secondbrain
 │
 ├── core/
 │   ├── designsystem/                 # tokens from DESIGN.md: Color.kt, Type.kt, Shape.kt, Motion.kt, Theme.kt, components/ (Card, Chip, SectionHeader, BriefBlock, ChatBubble, Bubble, Panel, NavBar)
-│   ├── database/                     # Room only: AppDatabase.kt, entity/, dao/ — no business logic
+│   ├── database/                     # Room only: AppDatabase.kt, entity/ — no business logic. dao/ lands in Phase 1 alongside the screens/repositories that need it
 │   ├── network/                      # Supabase client (Postgrest/Storage/Realtime), DTOs, mappers entity<->dto
 │   ├── data/                         # repositories: single source of truth, composes database + network
 │   │   ├── ItemRepository.kt
