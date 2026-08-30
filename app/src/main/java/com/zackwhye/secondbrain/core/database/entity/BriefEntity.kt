@@ -3,8 +3,7 @@ package com.zackwhye.secondbrain.core.database.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-
-enum class BriefStatus { PENDING, READY, FAILED }
+import com.zackwhye.secondbrain.core.model.BriefStatus
 
 @Entity(tableName = "briefs", indices = [Index(value = ["itemId"], unique = true)])
 data class BriefEntity(

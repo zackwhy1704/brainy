@@ -1,6 +1,7 @@
 package com.zackwhye.secondbrain.feature.home.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -15,6 +16,9 @@ fun HomeRoute(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // Cancelled automatically when this leaves composition — the Compose-lifecycle-driven
+    // counterpart to the polling loop the ViewModel deliberately does not self-start.
+    LaunchedEffect(Unit) { viewModel.pollBriefsWhileActive() }
     HomeScreen(
         uiState = uiState,
         onItemClick = onItemClick,

@@ -10,6 +10,7 @@ import com.zackwhye.secondbrain.core.model.CapturedContext
 import com.zackwhye.secondbrain.core.model.Item
 import com.zackwhye.secondbrain.core.model.ItemSourceType
 import com.zackwhye.secondbrain.core.network.AuthSessionManager
+import com.zackwhye.secondbrain.core.network.withAuthRetry
 import com.zackwhye.secondbrain.core.network.api.SupabaseItemsApi
 import com.zackwhye.secondbrain.core.network.api.SupabaseStorageApi
 import com.zackwhye.secondbrain.core.network.dto.ItemDto
@@ -21,7 +22,6 @@ import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.asRequestBody
 import retrofit2.HttpException
-import retrofit2.Response
 import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -90,7 +90,7 @@ class ItemRepositoryImpl @Inject constructor(
                 updatedAt = isoNow,
             )
 
-            val insertResponse = withAuthRetry { bearer ->
+            val insertResponse = authSessionManager.withAuthRetry { bearer ->
                 itemsApi.insertItem(authorization = bearer, apiKey = BuildConfig.SUPABASE_ANON_KEY, item = listOf(dto))
             }
             if (!insertResponse.isSuccessful) throw HttpException(insertResponse)
@@ -109,7 +109,7 @@ class ItemRepositoryImpl @Inject constructor(
         val file = File(localPath)
         val contentType = mimeType ?: "application/octet-stream"
         val objectPath = "$userId/$itemId"
-        val response = withAuthRetry { bearer ->
+        val response = authSessionManager.withAuthRetry { bearer ->
             storageApi.upload(
                 bucket = "captures",
                 path = objectPath,
@@ -121,20 +121,6 @@ class ItemRepositoryImpl @Inject constructor(
         }
         if (!response.isSuccessful) throw HttpException(response)
         return objectPath
-    }
-
-    /**
-     * Attaches the current access token; on a 401 (proactive refresh missed it — clock skew,
-     * out-of-band revocation) forces one refresh and retries exactly once.
-     */
-    private suspend fun <T> withAuthRetry(call: suspend (bearer: String) -> Response<T>): Response<T> {
-        val token = authSessionManager.ensureAccessToken()
-        val response = call("Bearer $token")
-        if (response.code() == 401) {
-            val refreshedToken = authSessionManager.invalidateAndRefresh()
-            return call("Bearer $refreshedToken")
-        }
-        return response
     }
 
     private companion object {

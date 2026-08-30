@@ -3,6 +3,7 @@ package com.zackwhye.secondbrain.core.di
 import android.content.Context
 import androidx.room.Room
 import com.zackwhye.secondbrain.core.database.AppDatabase
+import com.zackwhye.secondbrain.core.database.dao.BriefDao
 import com.zackwhye.secondbrain.core.database.dao.ItemDao
 import dagger.Module
 import dagger.Provides
@@ -23,4 +24,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideItemDao(appDatabase: AppDatabase): ItemDao = appDatabase.itemDao()
+
+    @Provides
+    @Singleton
+    fun provideBriefDao(appDatabase: AppDatabase): BriefDao = appDatabase.briefDao()
 }

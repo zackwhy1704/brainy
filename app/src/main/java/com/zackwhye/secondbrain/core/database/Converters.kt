@@ -1,9 +1,9 @@
 package com.zackwhye.secondbrain.core.database
 
 import androidx.room.TypeConverter
-import com.zackwhye.secondbrain.core.database.entity.BriefStatus
 import com.zackwhye.secondbrain.core.database.entity.ItemLinkType
 import com.zackwhye.secondbrain.core.database.entity.ItemSyncState
+import com.zackwhye.secondbrain.core.model.BriefStatus
 import com.zackwhye.secondbrain.core.model.ItemSourceType
 import com.zackwhye.secondbrain.core.model.SourceDoor
 

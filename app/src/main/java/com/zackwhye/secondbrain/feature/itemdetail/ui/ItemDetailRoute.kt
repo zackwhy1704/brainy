@@ -1,6 +1,7 @@
 package com.zackwhye.secondbrain.feature.itemdetail.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -14,10 +15,12 @@ fun ItemDetailRoute(
     viewModel: ItemDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.pollBriefsWhileActive() }
     ItemDetailScreen(
         uiState = uiState,
         onBackClick = onBackClick,
         onRetry = {},
+        onRetryBrief = viewModel::retryBrief,
         modifier = modifier,
     )
 }

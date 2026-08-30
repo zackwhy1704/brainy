@@ -7,9 +7,22 @@ sealed interface ItemDetailUiState {
     data class Ready(val item: ItemDetailUiModel) : ItemDetailUiState
 }
 
-/** Raw content only in this build (Phase 1) — no brief yet, that's Phase 2. */
 data class ItemDetailUiModel(
     val title: String,
     val sourceLabel: String,
     val rawContent: String,
+    val brief: BriefUiState,
 )
+
+/** Never silently absent (ARCHITECTURE.md): a brief is always exactly one of these three. */
+sealed interface BriefUiState {
+    data object Pending : BriefUiState
+    data class Ready(
+        val summary: String,
+        val entities: List<String>,
+        val topics: List<String>,
+        val tasks: List<String>,
+        val importance: Int?,
+    ) : BriefUiState
+    data class Failed(val reason: String?, val retryable: Boolean) : BriefUiState
+}
