@@ -1,6 +1,7 @@
 package com.zackwhye.secondbrain.core.network
 
 import android.content.Context
+import android.util.Log
 import com.zackwhye.secondbrain.BuildConfig
 import com.zackwhye.secondbrain.core.network.api.SupabaseAuthApi
 import com.zackwhye.secondbrain.core.network.dto.AuthSessionDto
@@ -68,7 +69,26 @@ class AuthSessionManagerImpl @Inject constructor(
     private suspend fun refresh(refreshToken: String): AuthSessionDto =
         authApi.refreshToken(apiKey = BuildConfig.SUPABASE_ANON_KEY, body = RefreshTokenRequest(refreshToken))
 
+    /**
+     * A refresh-token rejection (revoked/expired) falls through to a fresh anonymous sign-in,
+     * which mints a NEW user id (see [ensureSession] / [invalidateAndRefresh]). Every item this
+     * install previously synced belongs to the old id and RLS hides it from the new session —
+     * silently, since Room still shows the local rows. This is the account-recovery gap recorded
+     * in ARCHITECTURE.md; not fixed here (that's the Phase 4 account-upgrade flow), only made
+     * detectable: the orphaned id is kept and the change is logged loudly.
+     */
     private fun persist(session: AuthSessionDto) {
+        val priorUserId = prefs.getString(KEY_USER_ID, null)
+        if (priorUserId != null && priorUserId != session.user.id) {
+            Log.e(
+                TAG,
+                "Identity changed: user id $priorUserId -> ${session.user.id}. The refresh token " +
+                    "was rejected and a new anonymous session was minted. Every item synced under " +
+                    "$priorUserId is now hidden from this session by RLS (known gap, see ARCHITECTURE.md).",
+            )
+            val orphaned = prefs.getStringSet(KEY_ORPHANED_USER_IDS, emptySet()).orEmpty() + priorUserId
+            prefs.edit().putStringSet(KEY_ORPHANED_USER_IDS, orphaned).apply()
+        }
         prefs.edit()
             .putString(KEY_USER_ID, session.user.id)
             .putString(KEY_ACCESS_TOKEN, session.accessToken)
@@ -77,9 +97,11 @@ class AuthSessionManagerImpl @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "AuthSessionManager"
         const val KEY_USER_ID = "user_id"
         const val KEY_ACCESS_TOKEN = "access_token"
         const val KEY_REFRESH_TOKEN = "refresh_token"
+        const val KEY_ORPHANED_USER_IDS = "orphaned_user_ids"
 
         /** Refresh a little before actual expiry rather than racing a request against it. */
         const val EXPIRY_BUFFER_SECONDS = 60L
