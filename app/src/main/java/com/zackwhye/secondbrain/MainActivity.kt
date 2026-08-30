@@ -1,30 +1,95 @@
 package com.zackwhye.secondbrain
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import com.zackwhye.secondbrain.core.designsystem.SecondBrainTheme
+import com.zackwhye.secondbrain.core.model.CapturedContext
+import com.zackwhye.secondbrain.core.model.ItemSourceType
+import com.zackwhye.secondbrain.core.model.SourceDoor
+import com.zackwhye.secondbrain.feature.capture.domain.SaveCapturedItemUseCase
+import com.zackwhye.secondbrain.navigation.SecondBrainNavHost
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import java.io.File
+import java.time.Instant
+import java.util.UUID
+import javax.inject.Inject
 
-/**
- * Phase 0 skeleton entry point only — no screens yet. Also the future
- * ACTION_SEND / ACTION_SEND_MULTIPLE target once feature/capture lands.
- */
+/** Door 1's ACTION_SEND target, and the app's normal entry point. */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var saveCapturedItem: SaveCapturedItemUseCase
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            SecondBrainTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Text(text = "Second Brain — skeleton builds. Screens start in Phase 1.")
-                }
+
+        if (intent?.action == Intent.ACTION_SEND) {
+            intentToCapturedContext(intent)?.let { context ->
+                lifecycleScope.launch { saveCapturedItem(context) }
             }
         }
+
+        setContent {
+            SecondBrainTheme {
+                SecondBrainNavHost()
+            }
+        }
+    }
+
+    private fun intentToCapturedContext(intent: Intent): CapturedContext? {
+        val mimeType = intent.type ?: return null
+        val now = Instant.now()
+
+        return when {
+            mimeType == "text/plain" -> {
+                val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
+                val isUrl = text.startsWith("http://") || text.startsWith("https://")
+                CapturedContext(
+                    door = SourceDoor.SHARE,
+                    sourceType = if (isUrl) ItemSourceType.URL else ItemSourceType.TEXT,
+                    sourceUri = if (isUrl) text else null,
+                    rawText = if (isUrl) null else text,
+                    capturedAt = now,
+                )
+            }
+
+            mimeType.startsWith("image/") || mimeType == "application/pdf" -> {
+                @Suppress("DEPRECATION")
+                val streamUri: Uri = intent.getParcelableExtra(Intent.EXTRA_STREAM) ?: return null
+                val localFile = copyToLocalFile(streamUri, mimeType) ?: return null
+                CapturedContext(
+                    door = SourceDoor.SHARE,
+                    sourceType = if (mimeType == "application/pdf") ItemSourceType.PDF else ItemSourceType.IMAGE,
+                    sourceUri = localFile.absolutePath,
+                    rawText = null,
+                    capturedAt = now,
+                    mimeType = mimeType,
+                )
+            }
+
+            else -> null
+        }
+    }
+
+    private fun copyToLocalFile(uri: Uri, mimeType: String): File? {
+        val extension = when {
+            mimeType == "application/pdf" -> "pdf"
+            mimeType == "image/png" -> "png"
+            else -> "jpg"
+        }
+        val captureDir = File(filesDir, "captures").apply { mkdirs() }
+        val destination = File(captureDir, "${UUID.randomUUID()}.$extension")
+        return runCatching {
+            contentResolver.openInputStream(uri)?.use { input ->
+                destination.outputStream().use { output -> input.copyTo(output) }
+            }
+            destination
+        }.onFailure { e -> Log.e("MainActivity", "copyToLocalFile failed for $uri", e) }.getOrNull()
     }
 }
