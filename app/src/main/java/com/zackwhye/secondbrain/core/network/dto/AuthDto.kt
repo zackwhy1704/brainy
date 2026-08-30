@@ -16,3 +16,6 @@ data class AuthSessionDto(
 
 @Serializable
 data class AuthUserDto(val id: String)
+
+@Serializable
+data class RefreshTokenRequest(@SerialName("refresh_token") val refreshToken: String)

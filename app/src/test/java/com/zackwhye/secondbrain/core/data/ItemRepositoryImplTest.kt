@@ -71,4 +71,48 @@ class ItemRepositoryImplTest {
         assertEquals("fake-user-id", stored?.userId)
         assertEquals(1, fakeItemsApi.lastInserted?.size)
     }
+
+    @Test
+    fun `a non-2xx response is treated as a failure, not silently marked SYNCED`() = runTest(UnconfinedTestDispatcher()) {
+        // Regression: insertItem() returns Response<Unit>, which Retrofit does NOT throw on for
+        // non-2xx — the old code never checked .isSuccessful, so a real server error (500 here,
+        // distinct from the 401-retry path below) was silently recorded as a successful sync.
+        fakeItemsApi.responseCodesQueue.clear()
+        fakeItemsApi.responseCodesQueue.add(500)
+        val repository = repository(scope = backgroundScope)
+
+        val id = repository.saveCapturedItem(sampleContext)
+        advanceUntilIdle()
+
+        assertEquals(ItemSyncState.FAILED, fakeDao.getById(id)?.syncState)
+    }
+
+    @Test
+    fun `a 401 triggers exactly one token refresh and retry, then succeeds`() = runTest(UnconfinedTestDispatcher()) {
+        fakeItemsApi.responseCodesQueue.clear()
+        fakeItemsApi.responseCodesQueue.add(401) // first attempt
+        fakeItemsApi.responseCodesQueue.add(201) // retry after refresh
+        val repository = repository(scope = backgroundScope)
+
+        val id = repository.saveCapturedItem(sampleContext)
+        advanceUntilIdle()
+
+        assertEquals(ItemSyncState.SYNCED, fakeDao.getById(id)?.syncState)
+        assertEquals(1, fakeAuth.refreshCallCount)
+        assertEquals(2, fakeItemsApi.callCount)
+    }
+
+    @Test
+    fun `a 401 where the refresh itself fails ends FAILED, not crashed`() = runTest(UnconfinedTestDispatcher()) {
+        fakeItemsApi.responseCodesQueue.clear()
+        fakeItemsApi.responseCodesQueue.add(401)
+        fakeAuth.shouldRefreshFail = true
+        val repository = repository(scope = backgroundScope)
+
+        val id = repository.saveCapturedItem(sampleContext) // must not throw
+        advanceUntilIdle()
+
+        assertEquals(ItemSyncState.FAILED, fakeDao.getById(id)?.syncState)
+        assertEquals(1, fakeAuth.refreshCallCount)
+    }
 }

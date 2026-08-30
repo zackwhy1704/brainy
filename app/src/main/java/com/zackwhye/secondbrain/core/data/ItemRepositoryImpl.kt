@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.asRequestBody
+import retrofit2.HttpException
+import retrofit2.Response
 import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -67,11 +69,9 @@ class ItemRepositoryImpl @Inject constructor(
     private suspend fun sync(id: String, context: CapturedContext) {
         try {
             val userId = authSessionManager.ensureUserId()
-            val accessToken = authSessionManager.ensureAccessToken()
-            val bearer = "Bearer $accessToken"
 
             val remoteSourceUri = if (context.sourceType == ItemSourceType.IMAGE || context.sourceType == ItemSourceType.PDF) {
-                context.sourceUri?.let { localPath -> uploadToStorage(bearer, userId, id, localPath, context.mimeType) }
+                context.sourceUri?.let { localPath -> uploadToStorage(userId, id, localPath, context.mimeType) }
             } else {
                 context.sourceUri
             }
@@ -89,7 +89,11 @@ class ItemRepositoryImpl @Inject constructor(
                 createdAt = isoNow,
                 updatedAt = isoNow,
             )
-            itemsApi.insertItem(authorization = bearer, apiKey = BuildConfig.SUPABASE_ANON_KEY, item = listOf(dto))
+
+            val insertResponse = withAuthRetry { bearer ->
+                itemsApi.insertItem(authorization = bearer, apiKey = BuildConfig.SUPABASE_ANON_KEY, item = listOf(dto))
+            }
+            if (!insertResponse.isSuccessful) throw HttpException(insertResponse)
 
             itemDao.getById(id)?.let { itemDao.update(it.copy(userId = userId, syncState = ItemSyncState.SYNCED)) }
         } catch (e: CancellationException) {
@@ -100,19 +104,36 @@ class ItemRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun uploadToStorage(bearer: String, userId: String, itemId: String, localPath: String, mimeType: String?): String {
+    private suspend fun uploadToStorage(userId: String, itemId: String, localPath: String, mimeType: String?): String {
         val file = File(localPath)
         val contentType = mimeType ?: "application/octet-stream"
         val objectPath = "$userId/$itemId"
-        storageApi.upload(
-            bucket = "captures",
-            path = objectPath,
-            authorization = bearer,
-            apiKey = BuildConfig.SUPABASE_ANON_KEY,
-            contentType = contentType,
-            file = file.asRequestBody(contentType.toMediaType()),
-        )
+        val response = withAuthRetry { bearer ->
+            storageApi.upload(
+                bucket = "captures",
+                path = objectPath,
+                authorization = bearer,
+                apiKey = BuildConfig.SUPABASE_ANON_KEY,
+                contentType = contentType,
+                file = file.asRequestBody(contentType.toMediaType()),
+            )
+        }
+        if (!response.isSuccessful) throw HttpException(response)
         return objectPath
+    }
+
+    /**
+     * Attaches the current access token; on a 401 (proactive refresh missed it — clock skew,
+     * out-of-band revocation) forces one refresh and retries exactly once.
+     */
+    private suspend fun <T> withAuthRetry(call: suspend (bearer: String) -> Response<T>): Response<T> {
+        val token = authSessionManager.ensureAccessToken()
+        val response = call("Bearer $token")
+        if (response.code() == 401) {
+            val refreshedToken = authSessionManager.invalidateAndRefresh()
+            return call("Bearer $refreshedToken")
+        }
+        return response
     }
 
     private companion object {
