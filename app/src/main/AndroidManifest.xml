@@ -1,10 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".SecondBrainApp"
@@ -40,28 +36,15 @@
         </activity>
 
         <!--
-          Phase 1(d) — Door 3 platform-risk spike only. No product logic, no
-          bubble state machine, no panel content. Not exported: no in-app
-          entry point, no Home/Ask/Navigation wiring.
-
-          exported=false is the correct default and what ships, but note for
-          whoever tests this next: on both the API 36 Play-image emulator and
-          a physical MIUI device, `adb shell am start-service` /
-          `start-foreground-service` on a non-exported service is refused
-          ("Requires permission not exported from uid ...") because adb
-          shell cannot become root on a production system image. Testing
-          required flipping this to exported="true" temporarily. A real
-          in-app debug-only trigger (or a signature-level permission) is the
-          better long-term answer if this needs routine manual testing.
+          OverlaySpikeService (Phase 1(d) Door 3 platform-risk spike) and the three permissions
+          it alone needs (SYSTEM_ALERT_WINDOW, FOREGROUND_SERVICE_SPECIAL_USE, POST_NOTIFICATIONS
+          — plus plain FOREGROUND_SERVICE, needed to start any foreground service and, like the
+          other three, unused by anything else in this app) live in src/debug/AndroidManifest.xml,
+          not here. Door 3 is "first thing to cut under pressure" (ARCHITECTURE.md); a release
+          build has no reachable path to this service (nothing in shipped code starts it) and
+          should not declare permissions for a feature it doesn't ship. See that file for the
+          service declaration and the exported=false testing note.
         -->
-        <service
-            android:name=".feature.overlay.ui.OverlaySpikeService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Phase 1(d) platform-risk spike for an ambient capture-context bubble (ARCHITECTURE.md, four doors, Door 3). No screen reading; user-initiated only." />
-        </service>
     </application>
 
 </manifest>

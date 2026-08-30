@@ -1,0 +1,38 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Phase 1(d) — Door 3 platform-risk spike only. No product logic, no bubble state machine,
+      no panel content. Debug-only: OverlaySpikeService.kt lives in src/debug/java, not
+      src/main/java, and these permissions are declared only in this debug-variant manifest, so
+      a release build carries neither the class nor the SYSTEM_ALERT_WINDOW /
+      FOREGROUND_SERVICE_SPECIAL_USE / POST_NOTIFICATIONS permission cost of a feature
+      (ARCHITECTURE.md: Door 3) that's explicitly "first thing to cut under pressure" and may
+      never ship.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <!--
+          Not exported: no in-app entry point, no Home/Ask/Navigation wiring. exported=false is
+          the correct default, but note for whoever tests this next: on both the API 36
+          Play-image emulator and a physical MIUI device, `adb shell am start-service` /
+          `start-foreground-service` on a non-exported service is refused ("Requires permission
+          not exported from uid ...") because adb shell cannot become root on a production
+          system image. Testing required flipping this to exported="true" temporarily, rebuilding,
+          testing, then reverting. A real in-app debug-only trigger (or a signature-level
+          permission) is the better long-term answer if this needs routine manual testing.
+        -->
+        <service
+            android:name="com.zackwhye.secondbrain.feature.overlay.ui.OverlaySpikeService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Phase 1(d) platform-risk spike for an ambient capture-context bubble (ARCHITECTURE.md, four doors, Door 3). No screen reading; user-initiated only." />
+        </service>
+    </application>
+
+</manifest>

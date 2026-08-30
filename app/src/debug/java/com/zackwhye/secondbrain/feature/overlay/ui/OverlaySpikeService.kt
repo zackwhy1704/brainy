@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.app.NotificationCompat
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
@@ -199,20 +198,25 @@ class OverlaySpikeService : LifecycleService(), ViewModelStoreOwner, SavedStateR
 }
 
 /**
- * `ViewTreeLifecycleOwner.set` / `ViewTreeViewModelStoreOwner.set` are the only public setters
- * androidx.lifecycle 2.10.0 ships (no extension-function replacement exists in this version), but
+ * `ViewTreeLifecycleOwner.set` / `ViewTreeViewModelStoreOwner.set` are the only setters
+ * androidx.lifecycle 2.10.0 ships (no extension-function replacement exists in this version), and
  * Kotlin 2.2.21 — this project's pinned compiler, see gradle/libs.versions.toml — resolves them as
- * `HIDDEN`-level deprecated: the bytecode is present and callable from Java, but Kotlin source
- * resolution reports "Unresolved reference" rather than a deprecation warning. Java reflection
- * bypasses that Kotlin-compiler-only restriction and calls the same still-public JVM method.
+ * `HIDDEN`-level deprecated: present in bytecode, invisible to Kotlin source resolution ("Unresolved
+ * reference", not a deprecation warning). Rather than reflect into the hidden method, this sets the
+ * exact same view tags those methods set internally — resolved by NAME through the resource table
+ * instead of importing the library's own (also Kotlin-invisible) `R` class. [requireViewTreeTagId]
+ * fails loudly, at attach time, if the platform ever stops shipping these ids — never silently, at
+ * render time, with a bubble that has no lifecycle owner.
  */
 private fun ComposeView.attachViewTreeOwners(owner: OverlaySpikeService) {
-    Class.forName("androidx.lifecycle.ViewTreeLifecycleOwner")
-        .getMethod("set", View::class.java, LifecycleOwner::class.java)
-        .invoke(null, this, owner)
-    Class.forName("androidx.lifecycle.ViewTreeViewModelStoreOwner")
-        .getMethod("set", View::class.java, ViewModelStoreOwner::class.java)
-        .invoke(null, this, owner)
+    setTag(requireViewTreeTagId("view_tree_lifecycle_owner"), owner)
+    setTag(requireViewTreeTagId("view_tree_view_model_store_owner"), owner)
+}
+
+private fun View.requireViewTreeTagId(name: String): Int {
+    val id = resources.getIdentifier(name, "id", context.packageName)
+    check(id != 0) { "View-tree tag id '$name' not found in the merged resource table" }
+    return id
 }
 
 private const val DRAG_THRESHOLD_PX = 12f
