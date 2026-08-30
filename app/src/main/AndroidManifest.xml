@@ -45,8 +45,9 @@
           entry point, no Home/Ask/Navigation wiring.
 
           exported=false is the correct default and what ships, but note for
-          whoever tests this next: on this API 36 Play-image emulator, `adb
-          shell am start-service` on a non-exported service is refused
+          whoever tests this next: on both the API 36 Play-image emulator and
+          a physical MIUI device, `adb shell am start-service` /
+          `start-foreground-service` on a non-exported service is refused
           ("Requires permission not exported from uid ...") because adb
           shell cannot become root on a production system image. Testing
           required flipping this to exported="true" temporarily. A real
