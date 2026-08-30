@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".SecondBrainApp"
@@ -34,6 +38,29 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
+
+        <!--
+          Phase 1(d) — Door 3 platform-risk spike only. No product logic, no
+          bubble state machine, no panel content. Not exported: no in-app
+          entry point, no Home/Ask/Navigation wiring.
+
+          exported=false is the correct default and what ships, but note for
+          whoever tests this next: on this API 36 Play-image emulator, `adb
+          shell am start-service` on a non-exported service is refused
+          ("Requires permission not exported from uid ...") because adb
+          shell cannot become root on a production system image. Testing
+          required flipping this to exported="true" temporarily. A real
+          in-app debug-only trigger (or a signature-level permission) is the
+          better long-term answer if this needs routine manual testing.
+        -->
+        <service
+            android:name=".feature.overlay.ui.OverlaySpikeService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Phase 1(d) platform-risk spike for an ambient capture-context bubble (ARCHITECTURE.md, four doors, Door 3). No screen reading; user-initiated only." />
+        </service>
     </application>
 
 </manifest>

@@ -17,3 +17,6 @@ val SpacingXxl: Dp = 32.dp
 val CardPadding: Dp = SpacingLg // 16dp
 val CardGap: Dp = SpacingMd // 12dp
 val ScreenHorizontalMargin: Dp = SpacingLg // 16dp
+
+/** DESIGN.md → component #9 (Bubble): 56dp circle. Doesn't fall on the generic scale — Door 3's own spec, not a generic step. */
+val BubbleDiameter: Dp = 56.dp
