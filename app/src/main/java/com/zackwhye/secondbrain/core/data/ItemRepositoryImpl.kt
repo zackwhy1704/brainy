@@ -96,6 +96,7 @@ class ItemRepositoryImpl @Inject constructor(
             if (!insertResponse.isSuccessful) throw HttpException(insertResponse)
 
             itemDao.getById(id)?.let { itemDao.update(it.copy(userId = userId, syncState = ItemSyncState.SYNCED)) }
+            Log.i(TAG, "sync succeeded for item $id (user $userId)")
         } catch (e: CancellationException) {
             throw e // structured concurrency — a cancelled sync is not a failed sync
         } catch (e: Exception) {
