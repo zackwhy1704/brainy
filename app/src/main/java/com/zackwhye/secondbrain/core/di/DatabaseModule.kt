@@ -3,6 +3,7 @@ package com.zackwhye.secondbrain.core.di
 import android.content.Context
 import androidx.room.Room
 import com.zackwhye.secondbrain.core.database.AppDatabase
+import com.zackwhye.secondbrain.core.database.dao.ItemDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,4 +19,8 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "second_brain.db").build()
+
+    @Provides
+    @Singleton
+    fun provideItemDao(appDatabase: AppDatabase): ItemDao = appDatabase.itemDao()
 }
