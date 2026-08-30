@@ -1,5 +1,6 @@
 package com.zackwhye.secondbrain.core.data
 
+import android.util.Log
 import com.zackwhye.secondbrain.BuildConfig
 import com.zackwhye.secondbrain.core.database.dao.ItemDao
 import com.zackwhye.secondbrain.core.database.entity.ItemEntity
@@ -12,6 +13,7 @@ import com.zackwhye.secondbrain.core.network.AuthSessionManager
 import com.zackwhye.secondbrain.core.network.api.SupabaseItemsApi
 import com.zackwhye.secondbrain.core.network.api.SupabaseStorageApi
 import com.zackwhye.secondbrain.core.network.dto.ItemDto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -90,7 +92,10 @@ class ItemRepositoryImpl @Inject constructor(
             itemsApi.insertItem(authorization = bearer, apiKey = BuildConfig.SUPABASE_ANON_KEY, item = listOf(dto))
 
             itemDao.getById(id)?.let { itemDao.update(it.copy(userId = userId, syncState = ItemSyncState.SYNCED)) }
+        } catch (e: CancellationException) {
+            throw e // structured concurrency — a cancelled sync is not a failed sync
         } catch (e: Exception) {
+            Log.e(TAG, "sync failed for item $id", e)
             itemDao.getById(id)?.let { itemDao.update(it.copy(syncState = ItemSyncState.FAILED)) }
         }
     }
@@ -108,6 +113,10 @@ class ItemRepositoryImpl @Inject constructor(
             file = file.asRequestBody(contentType.toMediaType()),
         )
         return objectPath
+    }
+
+    private companion object {
+        const val TAG = "ItemRepository"
     }
 }
 
