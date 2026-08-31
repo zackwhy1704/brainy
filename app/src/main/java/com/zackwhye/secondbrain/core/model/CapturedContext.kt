@@ -15,4 +15,7 @@ data class CapturedContext(
     val capturedAt: Instant,
     /** Set for IMAGE/PDF only — [sourceUri] is a local file path in that case, and this is its real MIME type for Storage upload. */
     val mimeType: String? = null,
+    /** Which Edge Function extraction profile this capture is sent with. "general" unless the user
+     * explicitly shared to the person-note share target (see MainActivity / the manifest alias). */
+    val extractionProfile: String = "general",
 )

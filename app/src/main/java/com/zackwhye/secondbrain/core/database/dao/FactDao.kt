@@ -19,4 +19,16 @@ interface FactDao {
 
     @Query("SELECT DISTINCT subject FROM facts WHERE sourceItemId = :itemId ORDER BY subject")
     fun observeSubjectsForItem(itemId: String): Flow<List<String>>
+
+    // Local mirror of the server's delete_item_cascade splice — see ItemRepositoryImpl.deleteItem.
+
+    @Query("SELECT * FROM facts WHERE sourceItemId = :itemId")
+    suspend fun getBySourceItem(itemId: String): List<FactEntity>
+
+    /** Repoints any fact superseded by [oldId] to [newValue] (null restores it as current). */
+    @Query("UPDATE facts SET supersededBy = :newValue WHERE supersededBy = :oldId")
+    suspend fun reassignSupersededBy(oldId: String, newValue: String?)
+
+    @Query("DELETE FROM facts WHERE sourceItemId = :itemId")
+    suspend fun deleteBySourceItem(itemId: String)
 }

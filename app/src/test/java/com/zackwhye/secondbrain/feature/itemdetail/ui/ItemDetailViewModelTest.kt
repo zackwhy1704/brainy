@@ -164,6 +164,32 @@ class ItemDetailViewModelTest {
     }
 
     @Test
+    fun `deleteItem success emits Deleted so the Route can navigate back`() = runTest {
+        putItem("1")
+        val viewModel = viewModel("1")
+        fakeItemRepository.deleteResult = true
+
+        viewModel.events.test {
+            viewModel.deleteItem()
+            assertEquals(ItemDetailEvent.Deleted, awaitItem())
+        }
+        assertEquals(1, fakeItemRepository.deleteCallCount)
+        assertEquals("1", fakeItemRepository.lastDeletedId)
+    }
+
+    @Test
+    fun `deleteItem failure emits DeleteFailed and the screen stays put`() = runTest {
+        putItem("1")
+        val viewModel = viewModel("1")
+        fakeItemRepository.deleteResult = false
+
+        viewModel.events.test {
+            viewModel.deleteItem()
+            assertEquals(ItemDetailEvent.DeleteFailed, awaitItem())
+        }
+    }
+
+    @Test
     fun `Loading then Error when repository fails`() = runTest {
         fakeItemRepository.setShouldError(true)
         val viewModel = viewModel("1")

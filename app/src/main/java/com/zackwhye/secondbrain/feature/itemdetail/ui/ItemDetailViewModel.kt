@@ -11,11 +11,14 @@ import com.zackwhye.secondbrain.core.model.BriefStatus
 import com.zackwhye.secondbrain.core.model.Item
 import com.zackwhye.secondbrain.core.model.ItemSourceType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -62,6 +65,18 @@ class ItemDetailViewModel @Inject constructor(
 
     fun retryBrief() {
         viewModelScope.launch { briefRepository.retryExtraction(itemId) }
+    }
+
+    private val _events = Channel<ItemDetailEvent>(Channel.BUFFERED)
+    val events: Flow<ItemDetailEvent> = _events.receiveAsFlow()
+
+    /** Called only after the confirmation dialog — the repository is remote-first, so a false
+     * result means nothing was removed and the screen stays put with an error snackbar. */
+    fun deleteItem() {
+        viewModelScope.launch {
+            val deleted = itemRepository.deleteItem(itemId)
+            _events.send(if (deleted) ItemDetailEvent.Deleted else ItemDetailEvent.DeleteFailed)
+        }
     }
 }
 

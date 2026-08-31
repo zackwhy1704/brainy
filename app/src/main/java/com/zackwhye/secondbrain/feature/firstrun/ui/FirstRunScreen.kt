@@ -60,7 +60,7 @@ fun FirstRunScreen(onContinue: () -> Unit, modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = "In any app, tap Share, then choose Second Brain. It appears on Home within seconds and gets a short brief.",
+                        text = "In any app, tap Share, then choose Second Brain. It appears on Home within seconds and gets a short brief. For notes about a person, choose “Second Brain (person)” instead — those are kept as facts you can track over time.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -68,6 +68,11 @@ fun FirstRunScreen(onContinue: () -> Unit, modifier: Modifier = Modifier) {
             }
             Text(
                 text = "Content you share is sent to an AI service to be summarised. Nothing is shared with other people.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Everything is stored under an anonymous identity on this device — uninstalling the app permanently deletes it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

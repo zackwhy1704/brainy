@@ -67,6 +67,9 @@ class MainActivity : ComponentActivity() {
     private fun intentToCapturedContext(intent: Intent): CapturedContext? {
         val mimeType = intent.type ?: return null
         val now = Instant.now()
+        // A share delivered through the ".PersonNoteShare" activity-alias keeps the alias as the
+        // intent's component — that's the entire per-capture profile selector (see the manifest).
+        val profile = if (intent.component?.className?.endsWith(".PersonNoteShare") == true) "relationship" else "general"
 
         return when {
             mimeType == "text/plain" -> {
@@ -78,6 +81,7 @@ class MainActivity : ComponentActivity() {
                     sourceUri = if (isUrl) text else null,
                     rawText = if (isUrl) null else text,
                     capturedAt = now,
+                    extractionProfile = profile,
                 )
             }
 
@@ -92,6 +96,7 @@ class MainActivity : ComponentActivity() {
                     rawText = null,
                     capturedAt = now,
                     mimeType = mimeType,
+                    extractionProfile = profile,
                 )
             }
 

@@ -1,5 +1,11 @@
 package com.zackwhye.secondbrain.feature.itemdetail.ui
 
+/** One-off events (never state): navigation and transient feedback after a delete attempt. */
+sealed interface ItemDetailEvent {
+    data object Deleted : ItemDetailEvent
+    data object DeleteFailed : ItemDetailEvent
+}
+
 sealed interface ItemDetailUiState {
     data object Loading : ItemDetailUiState
     data class Error(val message: String, val retryable: Boolean) : ItemDetailUiState
