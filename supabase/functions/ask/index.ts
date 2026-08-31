@@ -10,9 +10,10 @@ const CHAT_MODEL = "claude-haiku-4-5-20251001";
 const ANTHROPIC_VERSION = "2023-06-01";
 const MATCH_COUNT = 5;
 // Cosine similarity (1 - vector distance) below this is treated as "not actually relevant" even
-// though pgvector top-k always returns *something*. Approximate, not tuned against a real corpus
-// yet — text-embedding-3-small's unrelated-text baseline tends to sit under this.
-const SIMILARITY_THRESHOLD = 0.2;
+// though pgvector top-k always returns *something*. Tuned against the 12 gated items with
+// debug=true: on-topic hits scored 0.62–0.65, unrelated items 0.09–0.24. 0.2 let a 0.236 noise
+// item into context; 0.5 leaves little headroom for paraphrased questions. 0.3 sits in the gap.
+const SIMILARITY_THRESHOLD = 0.3;
 
 interface MatchRow {
   item_id: string;
@@ -109,9 +110,11 @@ Deno.serve(async (req: Request) => {
   }
 
   let question: string;
+  let debug = false;
   try {
     const body = await req.json();
     question = body.question;
+    debug = body.debug === true;
     if (!question || typeof question !== "string") throw new Error("missing question");
   } catch {
     return new Response(JSON.stringify({ error: "expected JSON body { question }" }), { status: 400 });
@@ -132,13 +135,19 @@ Deno.serve(async (req: Request) => {
     });
     if (error) throw new Error(`match_items RPC failed: ${error.message}`);
 
-    const matches = ((data as MatchRow[] | null) ?? []).filter((m) => m.similarity >= SIMILARITY_THRESHOLD);
+    const allMatches = (data as MatchRow[] | null) ?? [];
+    // debug=true: return every top-k candidate with its raw similarity, before thresholding —
+    // used to tune SIMILARITY_THRESHOLD against real captured data rather than guessing.
+    const debugScores = debug
+      ? allMatches.map((m) => ({ itemId: m.item_id, similarity: Number(m.similarity.toFixed(3)), label: citationLabel(m) }))
+      : undefined;
+    const matches = allMatches.filter((m) => m.similarity >= SIMILARITY_THRESHOLD);
 
     if (matches.length === 0) {
       // Never answer from model knowledge without a citation — this is the explicit
       // no-relevant-retrieval state, not a fallback to general knowledge.
       return new Response(
-        JSON.stringify({ hasResults: false, answer: null, citations: [] }),
+        JSON.stringify({ hasResults: false, answer: null, citations: [], debugScores }),
         { status: 200 },
       );
     }
@@ -148,7 +157,7 @@ Deno.serve(async (req: Request) => {
       .filter((m) => citedItemIds.includes(m.item_id))
       .map((m) => ({ itemId: m.item_id, title: citationLabel(m) }));
 
-    return new Response(JSON.stringify({ hasResults: true, answer, citations }), { status: 200 });
+    return new Response(JSON.stringify({ hasResults: true, answer, citations, debugScores }), { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: message }), { status: 500 });

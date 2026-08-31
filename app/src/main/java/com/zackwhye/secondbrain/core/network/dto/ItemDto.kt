@@ -13,6 +13,8 @@ data class ItemDto(
     @SerialName("source_uri") val sourceUri: String? = null,
     @SerialName("raw_text") val rawText: String? = null,
     val title: String? = null,
+    /** Selects the Edge Function's extraction profile (prompt + schema). Server default is "general". */
+    val profile: String = "general",
     @SerialName("captured_at") val capturedAt: String,
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,

@@ -27,6 +27,103 @@ function decodeJwtPayload(authHeader: string | null): { sub?: string; role?: str
   }
 }
 
+interface ExtractedFact {
+  subject: string;
+  category: string;
+  value: string;
+  quote: string;
+  confidence?: number;
+}
+
+const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+const escapeLike = (s: string) => s.replace(/[%_\\]/g, (c) => `\\${c}`);
+
+/**
+ * Versioned facts with provenance. For each extracted fact, look up the current (non-superseded)
+ * fact for the same subject+category:
+ *   - none        → insert
+ *   - same value  → corroborate: link this item as an additional source, no new fact row
+ *   - different   → insert the new fact and mark the old one superseded_by it (a recorded change)
+ * Facts are never UPDATEd in place (DB trigger enforces it). Subject matching is case-insensitive
+ * string equality only — no entity resolution; two spellings of one person diverge, by design for now.
+ * Re-running extraction for the same item is a no-op for facts it already produced.
+ */
+async function reconcileFacts(
+  // deno-lint-ignore no-explicit-any
+  service: any,
+  item: ItemRow,
+  raw: unknown,
+): Promise<{ inserted: number; corroborated: number; superseded: number; skipped: number }> {
+  const counts = { inserted: 0, corroborated: 0, superseded: 0, skipped: 0 };
+  if (!Array.isArray(raw)) return counts;
+
+  for (const candidate of raw as ExtractedFact[]) {
+    if (!candidate?.subject?.trim() || !candidate.category || !candidate.value?.trim() || !candidate.quote?.trim()) {
+      counts.skipped++;
+      continue;
+    }
+    const subject = candidate.subject.trim();
+    const value = candidate.value.trim();
+
+    const { data: current, error } = await service
+      .from("facts")
+      .select("id, value, source_item_id")
+      .eq("user_id", item.user_id)
+      .ilike("subject", escapeLike(subject))
+      .eq("category", candidate.category)
+      .is("superseded_by", null)
+      .order("valid_from", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new ExtractionError(`facts lookup failed: ${error.message}`);
+
+    if (current?.source_item_id === item.id) {
+      counts.skipped++; // already reconciled from this item (retry)
+      continue;
+    }
+
+    if (current && normalize(current.value) === normalize(value)) {
+      const { error: linkError } = await service
+        .from("fact_sources")
+        .upsert(
+          { user_id: item.user_id, fact_id: current.id, item_id: item.id, quote: candidate.quote.trim() },
+          { onConflict: "fact_id,item_id", ignoreDuplicates: true },
+        );
+      if (linkError) throw new ExtractionError(`fact_sources upsert failed: ${linkError.message}`);
+      counts.corroborated++;
+      continue;
+    }
+
+    const { data: inserted, error: insertError } = await service
+      .from("facts")
+      .insert({
+        user_id: item.user_id,
+        subject,
+        category: candidate.category,
+        value,
+        quote: candidate.quote.trim(),
+        confidence: typeof candidate.confidence === "number" ? candidate.confidence : null,
+        valid_from: item.captured_at,
+        source_item_id: item.id,
+      })
+      .select("id")
+      .single();
+    if (insertError) throw new ExtractionError(`facts insert failed: ${insertError.message}`);
+
+    if (current) {
+      const { error: supersedeError } = await service
+        .from("facts")
+        .update({ superseded_by: inserted.id })
+        .eq("id", current.id);
+      if (supersedeError) throw new ExtractionError(`facts supersede failed: ${supersedeError.message}`);
+      counts.superseded++;
+    } else {
+      counts.inserted++;
+    }
+  }
+  return counts;
+}
+
 /** Splits the profile's raw extraction result into briefs' fixed typed columns (BASE_FIELD_NAMES)
  * plus everything else (attributes jsonb) — this is the whole "no migration for a new profile"
  * seam: a profile's extra schema properties just fall into the second bucket automatically. */
@@ -59,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: item, error: itemError } = await service
     .from("items")
-    .select("id, user_id, source_type, source_uri, raw_text, title, profile")
+    .select("id, user_id, source_type, source_uri, raw_text, title, profile, captured_at")
     .eq("id", itemId)
     .maybeSingle<ItemRow>();
 
@@ -131,7 +228,19 @@ Deno.serve(async (req: Request) => {
       model: "text-embedding-3-small",
     });
 
-    return new Response(JSON.stringify({ status: "ready", profile: profile.name, attributes }), { status: 200 });
+    // Versioned facts — only the relationship profile emits a `facts` array; others fall through
+    // with zero counts. Runs after the brief/embedding writes and is deliberately non-fatal: a
+    // facts failure must not flip an already-written ready brief to failed. Logged, not swallowed.
+    let factCounts: Record<string, unknown>;
+    try {
+      factCounts = await reconcileFacts(service, item, attributes.facts);
+    } catch (factError) {
+      const msg = factError instanceof Error ? factError.message : String(factError);
+      console.error(`reconcileFacts failed for item ${item.id}: ${msg}`);
+      factCounts = { error: msg };
+    }
+
+    return new Response(JSON.stringify({ status: "ready", profile: profile.name, attributes, facts: factCounts }), { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await service.from("briefs").upsert(

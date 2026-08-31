@@ -12,6 +12,8 @@ data class ItemDetailUiModel(
     val sourceLabel: String,
     val rawContent: String,
     val brief: BriefUiState,
+    /** People this item produced facts about — tappable into the person view. Empty until extraction ran. */
+    val people: List<String>,
 )
 
 /** Never silently absent (ARCHITECTURE.md): a brief is always exactly one of these three. */

@@ -1,4 +1,4 @@
-package com.zackwhye.secondbrain.feature.itemdetail.ui
+package com.zackwhye.secondbrain.feature.person.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -7,22 +7,20 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-/** Wires [ItemDetailViewModel] to the stateless [ItemDetailScreen]. */
+/** Wires [PersonViewModel] to the stateless [PersonScreen]. */
 @Composable
-fun ItemDetailRoute(
+fun PersonRoute(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
-    onPersonClick: (String) -> Unit = {},
-    viewModel: ItemDetailViewModel = hiltViewModel(),
+    onSourceClick: (String) -> Unit = {},
+    viewModel: PersonViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { viewModel.pollBriefsWhileActive() }
-    ItemDetailScreen(
+    LaunchedEffect(Unit) { viewModel.pollFactsWhileActive() }
+    PersonScreen(
         uiState = uiState,
         onBackClick = onBackClick,
-        onRetry = {},
-        onRetryBrief = viewModel::retryBrief,
-        onPersonClick = onPersonClick,
+        onSourceClick = onSourceClick,
         modifier = modifier,
     )
 }

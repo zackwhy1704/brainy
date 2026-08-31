@@ -1,23 +1,25 @@
 package com.zackwhye.secondbrain.core.database
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.zackwhye.secondbrain.core.database.dao.BriefDao
+import com.zackwhye.secondbrain.core.database.dao.FactDao
 import com.zackwhye.secondbrain.core.database.dao.ItemDao
 import com.zackwhye.secondbrain.core.database.entity.BriefEntity
 import com.zackwhye.secondbrain.core.database.entity.DecisionEntity
 import com.zackwhye.secondbrain.core.database.entity.EmbeddingEntity
+import com.zackwhye.secondbrain.core.database.entity.FactEntity
 import com.zackwhye.secondbrain.core.database.entity.ItemEntity
 import com.zackwhye.secondbrain.core.database.entity.ItemLinkEntity
 import com.zackwhye.secondbrain.core.database.entity.PersonEntity
 import com.zackwhye.secondbrain.core.database.entity.ProjectEntity
 
 /**
- * Entities mirror ARCHITECTURE.md's schema rule exactly (schema-only for
- * projects/people/decisions/item_links in this build — see SCOPE.md). Phase 2
- * adds BriefDao: briefs sync down and render; people/decisions/embeddings stay
- * write-only from the Edge Function's side, no DAO needed for them here.
+ * Entities mirror ARCHITECTURE.md's schema rule (schema-only for projects/people/decisions/
+ * item_links in this build — see SCOPE.md). Phase 2 added BriefDao. v2 adds `facts` — versioned,
+ * provenance-carrying statements about a person, synced down read-only like briefs.
  */
 @Database(
     entities = [
@@ -28,12 +30,15 @@ import com.zackwhye.secondbrain.core.database.entity.ProjectEntity
         PersonEntity::class,
         DecisionEntity::class,
         ItemLinkEntity::class,
+        FactEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun itemDao(): ItemDao
     abstract fun briefDao(): BriefDao
+    abstract fun factDao(): FactDao
 }
