@@ -18,8 +18,10 @@ export const RELATIONSHIP_PROFILE: ExtractionProfile = {
     "name exactly as written. Each fact's `quote` must be a verbatim excerpt from the content that supports it. " +
     "Only record facts the content actually states — never infer beyond it. If a list of KNOWN CURRENT FACTS " +
     "is provided, compare each extracted fact against it: set `matches_fact_id` to the known fact about the same " +
-    "person and category, and set `changed` to true only when the substance materially differs (a restatement " +
-    "or rewording of the same fact is NOT a change). Content:",
+    "person and category. Then decide `changed` by asking: would the OLD statement now be false? Only then is it " +
+    "true. Different wording, more or less detail, or added emphasis is NOT a change. Example: known " +
+    "'Lives in London' vs new 'Still London-based for now' → changed=false (the old statement remains true). " +
+    "Known 'Lives in London' vs new 'Moved to Berlin last month' → changed=true. Content:",
   properties: {
     ...GENERAL_PROFILE.properties,
     facts: {

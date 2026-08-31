@@ -48,6 +48,10 @@ export class AnthropicGateway implements LlmGateway {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1024,
+        // Extraction is a judgment we want repeatable, not creative. At the API default (1.0) the
+        // same/changed verdict on a reworded-identical fact flipped between runs (guard pair (b):
+        // 4/9 correct). 0 removes sampling noise from that verdict; content variety is irrelevant here.
+        temperature: 0,
         tools: [tool],
         tool_choice: { type: "tool", name: TOOL_NAME },
         messages: [{ role: "user", content: userContent }],
