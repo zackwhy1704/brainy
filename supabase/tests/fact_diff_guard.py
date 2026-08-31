@@ -58,12 +58,21 @@ def rest(method: str, path: str, body=None, prefer=None):
         h["Prefer"] = prefer
     req = urllib.request.Request(f"{URL}/rest/v1/{path}", method=method, headers=h,
                                  data=json.dumps(body).encode() if body is not None else None)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            raw = r.read()
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        sys.exit(f"{method} {path} -> {e.code}: {e.read().decode()[:300]}")
+    # HTTP errors are real failures (auth, RLS, bad payload) and abort the run. Transient
+    # transport errors (a local DNS blip killed a run at 4/4 on pair (a)) are retried a few
+    # times so a host hiccup doesn't get misread as a pipeline result.
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                raw = r.read()
+                return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as e:
+            sys.exit(f"{method} {path} -> {e.code}: {e.read().decode()[:300]}")
+        except (urllib.error.URLError, OSError) as e:
+            if attempt == 3:
+                sys.exit(f"{method} {path} -> network error after 4 attempts: {e}")
+            print(f"    ~ network error ({e}); retrying in {5 * (attempt + 1)}s", flush=True)
+            time.sleep(5 * (attempt + 1))
 
 
 def capture(text: str) -> str:
