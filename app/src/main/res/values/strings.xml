@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">Second Brain</string>
-    <!-- Share-sheet label for the person-note alias: same app, extraction runs the relationship profile. -->
-    <string name="share_target_person_note">Second Brain (person)</string>
+    <!-- Share-sheet label for the person-note alias: same app, extraction runs the relationship
+         profile. Deliberately short and distinct from the app name: MIUI's share sheet truncates
+         longer labels, and "Second Brain (person)" rendered as a second identical "Second Brain"
+         (seen on the Xiaomi test device). -->
+    <string name="share_target_person_note">Person note</string>
 </resources>
