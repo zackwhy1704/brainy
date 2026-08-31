@@ -115,4 +115,36 @@ class ItemRepositoryImplTest {
         assertEquals(ItemSyncState.FAILED, fakeDao.getById(id)?.syncState)
         assertEquals(1, fakeAuth.refreshCallCount)
     }
+
+    @Test
+    fun `retryFailedSyncs re-attempts a FAILED item and flips it to SYNCED once the network recovers`() =
+        runTest(UnconfinedTestDispatcher()) {
+            fakeAuth.shouldFail = true
+            val repository = repository(scope = backgroundScope)
+            val id = repository.saveCapturedItem(sampleContext)
+            advanceUntilIdle()
+            assertEquals(ItemSyncState.FAILED, fakeDao.getById(id)?.syncState) // sanity: really failed first
+
+            fakeAuth.shouldFail = false // "network recovers" / "app comes to foreground"
+            repository.retryFailedSyncs()
+            advanceUntilIdle()
+
+            assertEquals(ItemSyncState.SYNCED, fakeDao.getById(id)?.syncState)
+            assertEquals("fake-user-id", fakeDao.getById(id)?.userId)
+        }
+
+    @Test
+    fun `retryFailedSyncs does not touch items that already synced`() = runTest(UnconfinedTestDispatcher()) {
+        fakeAuth.shouldFail = false
+        val repository = repository(scope = backgroundScope)
+        val id = repository.saveCapturedItem(sampleContext)
+        advanceUntilIdle()
+        assertEquals(ItemSyncState.SYNCED, fakeDao.getById(id)?.syncState)
+        val callsBeforeRetry = fakeItemsApi.callCount
+
+        repository.retryFailedSyncs()
+        advanceUntilIdle()
+
+        assertEquals(callsBeforeRetry, fakeItemsApi.callCount) // no re-sync of an already-SYNCED item
+    }
 }

@@ -2,6 +2,7 @@ package com.zackwhye.secondbrain.core.data
 
 import com.zackwhye.secondbrain.core.database.dao.ItemDao
 import com.zackwhye.secondbrain.core.database.entity.ItemEntity
+import com.zackwhye.secondbrain.core.database.entity.ItemSyncState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -24,4 +25,7 @@ class FakeItemDao : ItemDao {
     override fun observeById(id: String): Flow<ItemEntity?> = items.map { it[id] }
 
     override suspend fun getById(id: String): ItemEntity? = items.value[id]
+
+    override suspend fun getFailed(): List<ItemEntity> =
+        items.value.values.filter { it.syncState == ItemSyncState.FAILED }
 }
