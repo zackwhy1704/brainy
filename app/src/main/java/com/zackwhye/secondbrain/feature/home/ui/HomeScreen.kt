@@ -3,6 +3,7 @@ package com.zackwhye.secondbrain.feature.home.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -164,8 +165,11 @@ private fun HomeItemCard(item: HomeItemUiModel, onClick: () -> Unit, modifier: M
             }
         }
         if (item.topicChips.isNotEmpty()) {
-            Row(
+            // FlowRow, not Row: a plain Row squeezes the last chip into a one-character-wide
+            // column once the real topics run past the card width (seen on-device with 4 chips).
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingSm),
+                verticalArrangement = Arrangement.spacedBy(SpacingSm),
                 modifier = Modifier.padding(top = SpacingMd),
             ) {
                 item.topicChips.forEach { chip -> SecondBrainChip(text = chip) }

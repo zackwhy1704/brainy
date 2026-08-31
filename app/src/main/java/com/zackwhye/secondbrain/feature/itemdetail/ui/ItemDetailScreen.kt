@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -147,8 +148,9 @@ private fun BriefReadyContent(brief: BriefUiState.Ready) {
     Column {
         Text(brief.summary, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         if (brief.topics.isNotEmpty()) {
-            Row(
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(SpacingSm),
+                verticalArrangement = Arrangement.spacedBy(SpacingSm),
                 modifier = Modifier.padding(top = SpacingMd),
             ) {
                 brief.topics.forEach { topic -> SecondBrainChip(text = topic) }

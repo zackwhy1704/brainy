@@ -1,5 +1,7 @@
 package com.zackwhye.secondbrain.core.di
 
+import com.zackwhye.secondbrain.core.data.AskRepository
+import com.zackwhye.secondbrain.core.data.AskRepositoryImpl
 import com.zackwhye.secondbrain.core.data.BriefRepository
 import com.zackwhye.secondbrain.core.data.BriefRepositoryImpl
 import com.zackwhye.secondbrain.core.data.ItemRepository
@@ -21,4 +23,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindBriefRepository(impl: BriefRepositoryImpl): BriefRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAskRepository(impl: AskRepositoryImpl): AskRepository
 }

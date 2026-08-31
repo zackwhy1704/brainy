@@ -66,6 +66,20 @@ class ItemRepositoryImpl @Inject constructor(
         return id
     }
 
+    override suspend fun retryFailedSyncs() {
+        itemDao.getFailed().forEach { entity ->
+            val context = CapturedContext(
+                door = entity.sourceDoor,
+                sourceType = entity.sourceType,
+                sourceUri = entity.sourceUri,
+                rawText = entity.rawText,
+                capturedAt = Instant.ofEpochMilli(entity.capturedAt),
+                mimeType = entity.recoveredMimeType(),
+            )
+            sync(entity.id, context)
+        }
+    }
+
     private suspend fun sync(id: String, context: CapturedContext) {
         try {
             val userId = authSessionManager.ensureUserId()
@@ -126,6 +140,15 @@ class ItemRepositoryImpl @Inject constructor(
     private companion object {
         const val TAG = "ItemRepository"
     }
+}
+
+/** Recovers the original upload Content-Type for a retried IMAGE/PDF sync — ItemEntity never
+ * persists mimeType itself (only CapturedContext carries it at initial-capture time), but
+ * MainActivity.copyToLocalFile names the file by extension, so the local path recovers it. */
+private fun ItemEntity.recoveredMimeType(): String? = when (sourceType) {
+    ItemSourceType.PDF -> "application/pdf"
+    ItemSourceType.IMAGE -> if (sourceUri?.endsWith(".png") == true) "image/png" else "image/jpeg"
+    else -> null
 }
 
 private fun ItemEntity.toDomain(): Item = Item(

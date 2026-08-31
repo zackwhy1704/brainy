@@ -1,6 +1,7 @@
 package com.zackwhye.secondbrain.core.di
 
 import com.zackwhye.secondbrain.BuildConfig
+import com.zackwhye.secondbrain.core.network.api.SupabaseAskApi
 import com.zackwhye.secondbrain.core.network.api.SupabaseAuthApi
 import com.zackwhye.secondbrain.core.network.api.SupabaseBriefsApi
 import com.zackwhye.secondbrain.core.network.api.SupabaseItemsApi
@@ -58,4 +59,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideSupabaseBriefsApi(retrofit: Retrofit): SupabaseBriefsApi = retrofit.create(SupabaseBriefsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideSupabaseAskApi(retrofit: Retrofit): SupabaseAskApi = retrofit.create(SupabaseAskApi::class.java)
 }

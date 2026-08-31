@@ -28,16 +28,31 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        if (intent?.action == Intent.ACTION_SEND) {
-            intentToCapturedContext(intent)?.let { context ->
-                lifecycleScope.launch { saveCapturedItem(context) }
-            }
-        }
+        handleSendIntent(intent)
 
         setContent {
             SecondBrainTheme {
                 SecondBrainNavHost()
+            }
+        }
+    }
+
+    /**
+     * Without this, a second share while Second Brain is already the foreground task (its
+     * existing task just gets brought forward, not recreated) is silently dropped — onCreate()
+     * never runs again, so the new intent's content never reaches saveCapturedItem. Confirmed
+     * on-device: repeated shares in quick succession only captured the first.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSendIntent(intent)
+    }
+
+    private fun handleSendIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND) {
+            intentToCapturedContext(intent)?.let { context ->
+                lifecycleScope.launch { saveCapturedItem(context) }
             }
         }
     }

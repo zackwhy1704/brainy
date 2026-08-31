@@ -33,4 +33,8 @@ class FakeItemRepository : ItemRepository {
     override suspend fun saveCapturedItem(context: CapturedContext): String {
         throw NotImplementedError("Not needed by current ViewModel tests")
     }
+
+    override suspend fun retryFailedSyncs() {
+        throw NotImplementedError("Not needed by current ViewModel tests")
+    }
 }

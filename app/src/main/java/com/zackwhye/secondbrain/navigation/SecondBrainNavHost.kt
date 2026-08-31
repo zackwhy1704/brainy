@@ -63,7 +63,10 @@ fun SecondBrainNavHost(navController: NavHostController = rememberNavController(
                 )
             }
             composable<Destinations.Ask> {
-                AskRoute(modifier = Modifier.padding(padding))
+                AskRoute(
+                    modifier = Modifier.padding(padding),
+                    onCitationClick = { id -> navController.navigate(Destinations.ItemDetail(id)) },
+                )
             }
         }
     }
