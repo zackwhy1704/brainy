@@ -3,7 +3,9 @@ import { AnthropicGateway } from "./providers/anthropic.ts";
 import { normalizeContent } from "./normalize.ts";
 import { embed } from "./embeddings.ts";
 import { ExtractionError } from "./llm_gateway.ts";
-import type { BriefJson, ItemRow } from "./types.ts";
+import { resolveProfile } from "./profiles/registry.ts";
+import { BASE_FIELD_NAMES } from "./profiles/types.ts";
+import type { ItemRow } from "./types.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -25,6 +27,19 @@ function decodeJwtPayload(authHeader: string | null): { sub?: string; role?: str
   }
 }
 
+/** Splits the profile's raw extraction result into briefs' fixed typed columns (BASE_FIELD_NAMES)
+ * plus everything else (attributes jsonb) — this is the whole "no migration for a new profile"
+ * seam: a profile's extra schema properties just fall into the second bucket automatically. */
+function splitResult(raw: Record<string, unknown>): { base: Record<string, unknown>; attributes: Record<string, unknown> } {
+  const base: Record<string, unknown> = {};
+  const attributes: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if ((BASE_FIELD_NAMES as readonly string[]).includes(key)) base[key] = value;
+    else attributes[key] = value;
+  }
+  return { base, attributes };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
@@ -44,7 +59,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: item, error: itemError } = await service
     .from("items")
-    .select("id, user_id, source_type, source_uri, raw_text, title")
+    .select("id, user_id, source_type, source_uri, raw_text, title, profile")
     .eq("id", itemId)
     .maybeSingle<ItemRow>();
 
@@ -61,10 +76,20 @@ Deno.serve(async (req: Request) => {
 
   try {
     const content = await normalizeContent(item, service);
+    const profile = resolveProfile(item.profile);
     const gateway = new AnthropicGateway(ANTHROPIC_API_KEY);
-    const brief: BriefJson = await gateway.extract(content);
+    const result = await gateway.extract(content, profile);
+    const { base, attributes } = splitResult(result);
 
-    const embeddingInput = [brief.summary, ...brief.topics, ...brief.entities].filter(Boolean).join("\n") ||
+    const summary = typeof base.summary === "string" ? base.summary : "";
+    const entities = Array.isArray(base.entities) ? base.entities as string[] : [];
+    const people = Array.isArray(base.people) ? base.people as string[] : [];
+    const topics = Array.isArray(base.topics) ? base.topics as string[] : [];
+    const tasks = Array.isArray(base.tasks) ? base.tasks as string[] : [];
+    const decisions = Array.isArray(base.decisions) ? base.decisions as string[] : [];
+    const importance = typeof base.importance === "number" ? base.importance : null;
+
+    const embeddingInput = [summary, ...topics, ...entities].filter(Boolean).join("\n") ||
       content.text || item.title || "captured content";
     const vector = await embed(embeddingInput, OPENAI_API_KEY);
 
@@ -72,11 +97,12 @@ Deno.serve(async (req: Request) => {
       {
         item_id: item.id,
         status: "ready",
-        summary: brief.summary,
-        entities: brief.entities,
-        topics: brief.topics,
-        tasks: brief.tasks,
-        importance: brief.importance,
+        summary,
+        entities,
+        topics,
+        tasks,
+        importance,
+        attributes,
         failure_reason: null,
         updated_at: nowIso,
       },
@@ -86,16 +112,14 @@ Deno.serve(async (req: Request) => {
 
     // Idempotent on retry: people/decisions are re-derived, not appended to.
     await service.from("people").delete().eq("item_id", item.id);
-    if (brief.people.length > 0) {
-      await service.from("people").insert(
-        brief.people.map((name) => ({ user_id: item.user_id, item_id: item.id, name })),
-      );
+    if (people.length > 0) {
+      await service.from("people").insert(people.map((name) => ({ user_id: item.user_id, item_id: item.id, name })));
     }
 
     await service.from("decisions").delete().eq("item_id", item.id);
-    if (brief.decisions.length > 0) {
+    if (decisions.length > 0) {
       await service.from("decisions").insert(
-        brief.decisions.map((description) => ({ user_id: item.user_id, item_id: item.id, description })),
+        decisions.map((description) => ({ user_id: item.user_id, item_id: item.id, description })),
       );
     }
 
@@ -107,7 +131,7 @@ Deno.serve(async (req: Request) => {
       model: "text-embedding-3-small",
     });
 
-    return new Response(JSON.stringify({ status: "ready" }), { status: 200 });
+    return new Response(JSON.stringify({ status: "ready", profile: profile.name, attributes }), { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await service.from("briefs").upsert(

@@ -1,14 +1,3 @@
-// Extraction JSON schema — ARCHITECTURE.md "Extraction JSON schema (Edge Function ⇄ LlmGateway contract)".
-export interface BriefJson {
-  summary: string;
-  entities: string[];
-  people: string[];
-  topics: string[];
-  tasks: string[];
-  decisions: string[];
-  importance: number; // 1-5
-}
-
 export interface NormalizedContent {
   // Either plain text, or an inline document/image for a vision-capable model.
   text?: string;
@@ -22,4 +11,5 @@ export interface ItemRow {
   source_uri: string | null;
   raw_text: string | null;
   title: string | null;
+  profile: string;
 }
