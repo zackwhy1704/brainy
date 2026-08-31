@@ -21,8 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import com.zackwhye.secondbrain.core.designsystem.CardPadding
 import com.zackwhye.secondbrain.core.designsystem.CardShape
@@ -75,6 +78,10 @@ private fun AskInputRow(enabled: Boolean, onAsk: (String) -> Unit) {
             value = question,
             onValueChange = { question = it },
             enabled = enabled,
+            singleLine = true,
+            // The keyboard's own action key submits too — a stranger won't hunt for the arrow glyph.
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { if (question.isNotBlank()) onAsk(question) }),
             placeholder = { Text("Ask your second brain…") },
             trailingIcon = {
                 IconButton(onClick = { if (question.isNotBlank()) onAsk(question) }, enabled = enabled) {

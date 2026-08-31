@@ -11,7 +11,9 @@ import com.zackwhye.secondbrain.core.designsystem.SecondBrainTheme
 import com.zackwhye.secondbrain.core.model.CapturedContext
 import com.zackwhye.secondbrain.core.model.ItemSourceType
 import com.zackwhye.secondbrain.core.model.SourceDoor
+import com.zackwhye.secondbrain.core.prefs.FirstRunStore
 import com.zackwhye.secondbrain.feature.capture.domain.SaveCapturedItemUseCase
+import com.zackwhye.secondbrain.navigation.Destinations
 import com.zackwhye.secondbrain.navigation.SecondBrainNavHost
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -25,14 +27,19 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var saveCapturedItem: SaveCapturedItemUseCase
+    @Inject lateinit var firstRunStore: FirstRunStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleSendIntent(intent)
 
+        // Read once at launch (a synchronous SharedPreferences read, not a network call): a
+        // stranger's first open lands on the one-time explainer; every later open lands on Home.
+        val startDestination = if (firstRunStore.hasSeenFirstRun()) Destinations.Home else Destinations.FirstRun
+
         setContent {
             SecondBrainTheme {
-                SecondBrainNavHost()
+                SecondBrainNavHost(startDestination = startDestination)
             }
         }
     }

@@ -31,9 +31,25 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
     }
 
+    // Release signing: keystore path + secrets come from local.properties (gitignored), never
+    // from source. When absent (CI, a fresh clone) the release build type simply has no signing
+    // config and assembleRelease produces app-release-unsigned.apk instead of failing.
+    val releaseStoreFile = localProperties.getProperty("RELEASE_STORE_FILE")
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
+                keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

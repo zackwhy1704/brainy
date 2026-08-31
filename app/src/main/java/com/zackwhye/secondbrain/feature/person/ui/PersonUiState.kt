@@ -3,8 +3,8 @@ package com.zackwhye.secondbrain.feature.person.ui
 sealed interface PersonUiState {
     data object Loading : PersonUiState
     data class Error(val message: String, val retryable: Boolean) : PersonUiState
-    /** No facts recorded for this name (yet). */
-    data object Empty : PersonUiState
+    /** No facts recorded for this name (yet) — carries the name so the screen can say so honestly. */
+    data class Empty(val subject: String) : PersonUiState
     data class Ready(val person: PersonUiModel) : PersonUiState
 }
 
