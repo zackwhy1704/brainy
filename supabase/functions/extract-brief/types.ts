@@ -12,4 +12,5 @@ export interface ItemRow {
   raw_text: string | null;
   title: string | null;
   profile: string;
+  captured_at: string;
 }

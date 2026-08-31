@@ -39,6 +39,7 @@ fun ItemDetailScreen(
     onBackClick: () -> Unit,
     onRetry: () -> Unit,
     onRetryBrief: () -> Unit,
+    onPersonClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -61,7 +62,7 @@ fun ItemDetailScreen(
                 ItemDetailUiState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 is ItemDetailUiState.Error -> ItemDetailErrorContent(uiState, onRetry, Modifier.align(Alignment.Center))
                 ItemDetailUiState.Empty -> ItemDetailEmptyContent(Modifier.align(Alignment.Center))
-                is ItemDetailUiState.Ready -> ItemDetailReadyContent(uiState.item, onRetryBrief)
+                is ItemDetailUiState.Ready -> ItemDetailReadyContent(uiState.item, onRetryBrief, onPersonClick)
             }
         }
     }
@@ -93,7 +94,7 @@ private fun ItemDetailEmptyContent(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ItemDetailReadyContent(item: ItemDetailUiModel, onRetryBrief: () -> Unit) {
+private fun ItemDetailReadyContent(item: ItemDetailUiModel, onRetryBrief: () -> Unit, onPersonClick: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -108,6 +109,33 @@ private fun ItemDetailReadyContent(item: ItemDetailUiModel, onRetryBrief: () -> 
             modifier = Modifier.padding(top = SpacingSm, bottom = SpacingLg),
         )
         BriefSection(item.brief, onRetryBrief)
+        if (item.people.isNotEmpty()) {
+            Text(
+                text = "People",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = SpacingLg, bottom = SpacingSm),
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(SpacingSm),
+                verticalArrangement = Arrangement.spacedBy(SpacingSm),
+            ) {
+                item.people.forEach { person ->
+                    Surface(
+                        onClick = { onPersonClick(person) },
+                        shape = CardShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
+                        Text(
+                            text = person,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = SpacingMd, vertical = SpacingSm),
+                        )
+                    }
+                }
+            }
+        }
         Text(
             text = item.rawContent,
             style = MaterialTheme.typography.bodyLarge,
@@ -195,33 +223,34 @@ private fun sampleItem(brief: BriefUiState) = ItemDetailUiModel(
     sourceLabel = "YouTube · captured today",
     rawContent = "A long-form discussion about automated reconciliation and where AI genuinely changes the workflow versus where it's marketing.",
     brief = brief,
+    people = listOf("Sarah Tan"),
 )
 
 @Preview(name = "Loading", showBackground = true)
 @Composable
 private fun ItemDetailLoadingPreview() {
-    SecondBrainTheme { ItemDetailScreen(ItemDetailUiState.Loading, {}, {}, {}) }
+    SecondBrainTheme { ItemDetailScreen(ItemDetailUiState.Loading, {}, {}, {}, {}) }
 }
 
 @Preview(name = "Error", showBackground = true)
 @Composable
 private fun ItemDetailErrorPreview() {
     SecondBrainTheme {
-        ItemDetailScreen(ItemDetailUiState.Error(message = "Couldn't load this item.", retryable = true), {}, {}, {})
+        ItemDetailScreen(ItemDetailUiState.Error(message = "Couldn't load this item.", retryable = true), {}, {}, {}, {})
     }
 }
 
 @Preview(name = "Empty", showBackground = true)
 @Composable
 private fun ItemDetailEmptyPreview() {
-    SecondBrainTheme { ItemDetailScreen(ItemDetailUiState.Empty, {}, {}, {}) }
+    SecondBrainTheme { ItemDetailScreen(ItemDetailUiState.Empty, {}, {}, {}, {}) }
 }
 
 @Preview(name = "Ready — brief pending", showBackground = true)
 @Composable
 private fun ItemDetailReadyBriefPendingPreview() {
     SecondBrainTheme {
-        ItemDetailScreen(ItemDetailUiState.Ready(sampleItem(BriefUiState.Pending)), {}, {}, {})
+        ItemDetailScreen(ItemDetailUiState.Ready(sampleItem(BriefUiState.Pending)), {}, {}, {}, {})
     }
 }
 
@@ -241,7 +270,7 @@ private fun ItemDetailReadyBriefReadyPreview() {
                     ),
                 ),
             ),
-            {}, {}, {},
+            {}, {}, {}, {},
         )
     }
 }
@@ -252,7 +281,7 @@ private fun ItemDetailReadyBriefFailedPreview() {
     SecondBrainTheme {
         ItemDetailScreen(
             ItemDetailUiState.Ready(sampleItem(BriefUiState.Failed(reason = "Anthropic API 529: overloaded", retryable = true))),
-            {}, {}, {},
+            {}, {}, {}, {},
         )
     }
 }
@@ -273,7 +302,7 @@ private fun ItemDetailReadyDarkPreview() {
                     ),
                 ),
             ),
-            {}, {}, {},
+            {}, {}, {}, {},
         )
     }
 }

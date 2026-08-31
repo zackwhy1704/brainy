@@ -15,12 +15,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
 import com.zackwhye.secondbrain.feature.ask.ui.AskRoute
 import com.zackwhye.secondbrain.feature.home.ui.HomeRoute
 import com.zackwhye.secondbrain.feature.itemdetail.ui.ItemDetailRoute
+import com.zackwhye.secondbrain.feature.person.ui.PersonRoute
 
-/** Minimal nav graph: Home ↔ Item detail, plus the Ask stub via bottom nav. */
+/** Nav graph: Home ↔ Item detail ↔ Person, Ask via bottom nav; Ask citations open Item detail. */
 @Composable
 fun SecondBrainNavHost(navController: NavHostController = rememberNavController(), modifier: Modifier = Modifier) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -60,6 +60,14 @@ fun SecondBrainNavHost(navController: NavHostController = rememberNavController(
                 ItemDetailRoute(
                     modifier = Modifier.padding(padding),
                     onBackClick = { navController.popBackStack() },
+                    onPersonClick = { subject -> navController.navigate(Destinations.Person(subject)) },
+                )
+            }
+            composable<Destinations.Person> {
+                PersonRoute(
+                    modifier = Modifier.padding(padding),
+                    onBackClick = { navController.popBackStack() },
+                    onSourceClick = { id -> navController.navigate(Destinations.ItemDetail(id)) },
                 )
             }
             composable<Destinations.Ask> {

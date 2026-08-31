@@ -6,4 +6,6 @@ sealed interface Destinations {
     @Serializable data object Home : Destinations
     @Serializable data class ItemDetail(val itemId: String) : Destinations
     @Serializable data object Ask : Destinations
+    /** [subject] is the person's name as written — the only identity facts carry in this build. */
+    @Serializable data class Person(val subject: String) : Destinations
 }

@@ -4,6 +4,8 @@ import com.zackwhye.secondbrain.core.data.AskRepository
 import com.zackwhye.secondbrain.core.data.AskRepositoryImpl
 import com.zackwhye.secondbrain.core.data.BriefRepository
 import com.zackwhye.secondbrain.core.data.BriefRepositoryImpl
+import com.zackwhye.secondbrain.core.data.FactRepository
+import com.zackwhye.secondbrain.core.data.FactRepositoryImpl
 import com.zackwhye.secondbrain.core.data.ItemRepository
 import com.zackwhye.secondbrain.core.data.ItemRepositoryImpl
 import dagger.Binds
@@ -27,4 +29,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAskRepository(impl: AskRepositoryImpl): AskRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFactRepository(impl: FactRepositoryImpl): FactRepository
 }

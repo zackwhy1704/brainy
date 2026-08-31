@@ -10,7 +10,7 @@ const TOOL_NAME = "record_extraction";
 export class AnthropicGateway implements LlmGateway {
   constructor(private readonly apiKey: string) {}
 
-  async extract(content: NormalizedContent, profile: ExtractionProfile): Promise<Record<string, unknown>> {
+  async extract(content: NormalizedContent, profile: ExtractionProfile, context?: string): Promise<Record<string, unknown>> {
     const tool = {
       name: TOOL_NAME,
       description: "Record the structured extraction of the captured content.",
@@ -32,9 +32,10 @@ export class AnthropicGateway implements LlmGateway {
         source: { type: "base64", media_type: content.inline.mediaType, data: content.inline.base64Data },
       });
     }
+    const preamble = context ? `${profile.promptPrefix}\n\n${context}` : profile.promptPrefix;
     userContent.push({
       type: "text",
-      text: content.text ? `${profile.promptPrefix}\n\n${content.text}` : `${profile.promptPrefix}\n\n(see attached content)`,
+      text: content.text ? `${preamble}\n\n${content.text}` : `${preamble}\n\n(see attached content)`,
     });
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {

@@ -99,6 +99,7 @@ class ItemRepositoryImpl @Inject constructor(
                 sourceUri = remoteSourceUri,
                 rawText = context.rawText,
                 title = null,
+                profile = DEFAULT_EXTRACTION_PROFILE,
                 capturedAt = DateTimeFormatter.ISO_INSTANT.format(context.capturedAt),
                 createdAt = isoNow,
                 updatedAt = isoNow,
@@ -139,6 +140,14 @@ class ItemRepositoryImpl @Inject constructor(
 
     private companion object {
         const val TAG = "ItemRepository"
+
+        /**
+         * Which Edge Function extraction profile every capture is sent with. "relationship" is a
+         * strict superset of "general" (same base fields + person-scoped `facts`), so briefs/Home are
+         * unaffected and facts simply come back empty for content with no people in it. One constant,
+         * not a UI: the cheapest way to make the versioned-facts gate reachable from a normal share.
+         */
+        const val DEFAULT_EXTRACTION_PROFILE = "relationship"
     }
 }
 

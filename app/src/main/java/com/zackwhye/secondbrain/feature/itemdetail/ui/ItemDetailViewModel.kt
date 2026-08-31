@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zackwhye.secondbrain.core.data.BriefRepository
+import com.zackwhye.secondbrain.core.data.FactRepository
 import com.zackwhye.secondbrain.core.data.ItemRepository
 import com.zackwhye.secondbrain.core.model.Brief
 import com.zackwhye.secondbrain.core.model.BriefStatus
@@ -17,9 +18,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.time.ZoneId
 import javax.inject.Inject
 
 private const val POLL_INTERVAL_MS = 5_000L
@@ -29,6 +30,7 @@ class ItemDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val itemRepository: ItemRepository,
     private val briefRepository: BriefRepository,
+    private val factRepository: FactRepository,
 ) : ViewModel() {
 
     private val itemId = checkNotNull(savedStateHandle.get<String>("itemId")) { "ItemDetail route requires itemId" }
@@ -36,8 +38,9 @@ class ItemDetailViewModel @Inject constructor(
     val uiState: StateFlow<ItemDetailUiState> = combine(
         itemRepository.observeItem(itemId),
         briefRepository.observeBrief(itemId),
-    ) { item, brief ->
-        if (item == null) ItemDetailUiState.Empty else ItemDetailUiState.Ready(item.toUiModel(brief))
+        factRepository.observeSubjectsForItem(itemId),
+    ) { item, brief, people ->
+        if (item == null) ItemDetailUiState.Empty else ItemDetailUiState.Ready(item.toUiModel(brief, people))
     }
         .catch { emit(ItemDetailUiState.Error(message = "Couldn't load this item.", retryable = true)) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ItemDetailUiState.Loading)
@@ -52,6 +55,7 @@ class ItemDetailViewModel @Inject constructor(
     suspend fun pollBriefsWhileActive() {
         while (true) {
             briefRepository.pollBriefs()
+            factRepository.pollFacts()
             delay(POLL_INTERVAL_MS)
         }
     }
@@ -82,7 +86,7 @@ private fun Brief?.toUiState(): BriefUiState = when {
     )
 }
 
-private fun Item.toUiModel(brief: Brief?): ItemDetailUiModel = ItemDetailUiModel(
+private fun Item.toUiModel(brief: Brief?, people: List<String>): ItemDetailUiModel = ItemDetailUiModel(
     title = title ?: when (sourceType) {
         ItemSourceType.URL -> sourceUri ?: "Untitled"
         ItemSourceType.TEXT -> rawText?.take(80) ?: "Untitled"
@@ -97,4 +101,5 @@ private fun Item.toUiModel(brief: Brief?): ItemDetailUiModel = ItemDetailUiModel
         ItemSourceType.PDF -> "PDF capture."
     },
     brief = brief.toUiState(),
+    people = people,
 )

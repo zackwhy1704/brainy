@@ -27,6 +27,124 @@ function decodeJwtPayload(authHeader: string | null): { sub?: string; role?: str
   }
 }
 
+interface ExtractedFact {
+  subject: string;
+  category: string;
+  value: string;
+  quote: string;
+  confidence?: number;
+  /** id of a KNOWN CURRENT FACT the model judged to be the same subject+category, or null. */
+  matches_fact_id?: string | null;
+  /** The model's judgment: does this materially differ from the matched fact? Restatement = false. */
+  changed?: boolean;
+}
+
+interface KnownFact {
+  id: string;
+  subject: string;
+  category: string;
+  value: string;
+}
+
+const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+const escapeLike = (s: string) => s.replace(/[%_\\]/g, (c) => `\\${c}`);
+
+/**
+ * Versioned facts with provenance. For each extracted fact, resolve the current (non-superseded)
+ * fact for the same subject+category — via the model's `matches_fact_id` when it named one that
+ * really exists for this user, else a case-insensitive string lookup — then:
+ *   - none                         → insert
+ *   - same (model says !changed,
+ *           or values normalize equal) → corroborate: link this item as an extra source, no new row
+ *   - different                    → insert the new fact and mark the old one superseded_by it
+ * Invariant kept either way: at most one current fact per (subject, category). Facts are never
+ * UPDATEd in place (DB trigger). Subject identity is string-match only — no entity resolution; two
+ * spellings of one person diverge, by design for now. Re-running for the same item is a no-op.
+ */
+async function reconcileFacts(
+  // deno-lint-ignore no-explicit-any
+  service: any,
+  item: ItemRow,
+  raw: unknown,
+  knownById: Map<string, KnownFact>,
+): Promise<{ inserted: number; corroborated: number; superseded: number; skipped: number }> {
+  const counts = { inserted: 0, corroborated: 0, superseded: 0, skipped: 0 };
+  if (!Array.isArray(raw)) return counts;
+
+  for (const candidate of raw as ExtractedFact[]) {
+    if (!candidate?.subject?.trim() || !candidate.category || !candidate.value?.trim() || !candidate.quote?.trim()) {
+      counts.skipped++;
+      continue;
+    }
+    const subject = candidate.subject.trim();
+    const value = candidate.value.trim();
+
+    // Only trust the model's match if it names a fact that exists for this user in the same
+    // category — the id came from the prompt, but a hallucinated or cross-category id must not
+    // supersede the wrong row.
+    const claimed = candidate.matches_fact_id ? knownById.get(candidate.matches_fact_id) : undefined;
+    const modelMatched = !!claimed && claimed.category === candidate.category &&
+      normalize(claimed.subject) === normalize(subject);
+
+    let query = service
+      .from("facts")
+      .select("id, value, source_item_id")
+      .eq("user_id", item.user_id)
+      .is("superseded_by", null);
+    query = modelMatched
+      ? query.eq("id", claimed!.id)
+      : query.ilike("subject", escapeLike(subject)).eq("category", candidate.category).order("valid_from", { ascending: false });
+    const { data: current, error } = await query.limit(1).maybeSingle();
+    if (error) throw new ExtractionError(`facts lookup failed: ${error.message}`);
+
+    if (current?.source_item_id === item.id) {
+      counts.skipped++; // already reconciled from this item (retry)
+      continue;
+    }
+
+    const restated = !!current && ((modelMatched && candidate.changed === false) || normalize(current.value) === normalize(value));
+    if (restated) {
+      const { error: linkError } = await service
+        .from("fact_sources")
+        .upsert(
+          { user_id: item.user_id, fact_id: current.id, item_id: item.id, quote: candidate.quote.trim() },
+          { onConflict: "fact_id,item_id", ignoreDuplicates: true },
+        );
+      if (linkError) throw new ExtractionError(`fact_sources upsert failed: ${linkError.message}`);
+      counts.corroborated++;
+      continue;
+    }
+
+    const { data: inserted, error: insertError } = await service
+      .from("facts")
+      .insert({
+        user_id: item.user_id,
+        subject,
+        category: candidate.category,
+        value,
+        quote: candidate.quote.trim(),
+        confidence: typeof candidate.confidence === "number" ? candidate.confidence : null,
+        valid_from: item.captured_at,
+        source_item_id: item.id,
+      })
+      .select("id")
+      .single();
+    if (insertError) throw new ExtractionError(`facts insert failed: ${insertError.message}`);
+
+    if (current) {
+      const { error: supersedeError } = await service
+        .from("facts")
+        .update({ superseded_by: inserted.id })
+        .eq("id", current.id);
+      if (supersedeError) throw new ExtractionError(`facts supersede failed: ${supersedeError.message}`);
+      counts.superseded++;
+    } else {
+      counts.inserted++;
+    }
+  }
+  return counts;
+}
+
 /** Splits the profile's raw extraction result into briefs' fixed typed columns (BASE_FIELD_NAMES)
  * plus everything else (attributes jsonb) — this is the whole "no migration for a new profile"
  * seam: a profile's extra schema properties just fall into the second bucket automatically. */
@@ -59,7 +177,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: item, error: itemError } = await service
     .from("items")
-    .select("id, user_id, source_type, source_uri, raw_text, title, profile")
+    .select("id, user_id, source_type, source_uri, raw_text, title, profile, captured_at")
     .eq("id", itemId)
     .maybeSingle<ItemRow>();
 
@@ -78,7 +196,31 @@ Deno.serve(async (req: Request) => {
     const content = await normalizeContent(item, service);
     const profile = resolveProfile(item.profile);
     const gateway = new AnthropicGateway(ANTHROPIC_API_KEY);
-    const result = await gateway.extract(content, profile);
+
+    // For fact-emitting profiles, hand the model the user's current facts so it can judge
+    // "same fact, reworded" vs. "changed" itself — normalized string equality never matches an
+    // LLM paraphrase, so without this every restatement looked like a change (seen on-device:
+    // "Based in Singapore" → "In Singapore for the foreseeable future" was recorded as a change).
+    // Capped at the 300 most recent current facts; subjects aren't known until after extraction.
+    let knownById = new Map<string, KnownFact>();
+    let context: string | undefined;
+    if ("facts" in profile.properties) {
+      const { data: known, error: knownError } = await service
+        .from("facts")
+        .select("id, subject, category, value")
+        .eq("user_id", item.user_id)
+        .is("superseded_by", null)
+        .order("valid_from", { ascending: false })
+        .limit(300);
+      if (knownError) throw new ExtractionError(`known facts lookup failed: ${knownError.message}`);
+      knownById = new Map((known as KnownFact[] ?? []).map((k) => [k.id, k]));
+      if (knownById.size > 0) {
+        context = "KNOWN CURRENT FACTS (id | subject | category | value):\n" +
+          [...knownById.values()].map((k) => `${k.id} | ${k.subject} | ${k.category} | ${k.value}`).join("\n");
+      }
+    }
+
+    const result = await gateway.extract(content, profile, context);
     const { base, attributes } = splitResult(result);
 
     const summary = typeof base.summary === "string" ? base.summary : "";
@@ -131,7 +273,19 @@ Deno.serve(async (req: Request) => {
       model: "text-embedding-3-small",
     });
 
-    return new Response(JSON.stringify({ status: "ready", profile: profile.name, attributes }), { status: 200 });
+    // Versioned facts — only the relationship profile emits a `facts` array; others fall through
+    // with zero counts. Runs after the brief/embedding writes and is deliberately non-fatal: a
+    // facts failure must not flip an already-written ready brief to failed. Logged, not swallowed.
+    let factCounts: Record<string, unknown>;
+    try {
+      factCounts = await reconcileFacts(service, item, attributes.facts, knownById);
+    } catch (factError) {
+      const msg = factError instanceof Error ? factError.message : String(factError);
+      console.error(`reconcileFacts failed for item ${item.id}: ${msg}`);
+      factCounts = { error: msg };
+    }
+
+    return new Response(JSON.stringify({ status: "ready", profile: profile.name, attributes, facts: factCounts }), { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await service.from("briefs").upsert(
