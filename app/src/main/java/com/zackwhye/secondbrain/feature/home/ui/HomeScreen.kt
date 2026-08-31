@@ -87,12 +87,23 @@ private fun HomeErrorContent(state: HomeUiState.Error, onRetry: () -> Unit, modi
 
 @Composable
 private fun HomeEmptyContent(modifier: Modifier = Modifier) {
-    Text(
-        text = "Nothing captured yet. Share something into Second Brain to see it here.",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(ScreenHorizontalMargin),
-    )
+    Column(modifier = modifier.padding(ScreenHorizontalMargin), verticalArrangement = Arrangement.spacedBy(SpacingMd)) {
+        Text(
+            text = "Nothing here yet.",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "Share a link, some text, a screenshot or a PDF from any app: tap Share, then pick Second Brain. It shows up here within seconds and gets a short brief.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "Notes about a person are kept as facts, so later you can see what changed and where it came from.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable

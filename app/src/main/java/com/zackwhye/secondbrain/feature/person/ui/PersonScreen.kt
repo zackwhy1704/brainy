@@ -62,12 +62,21 @@ fun PersonScreen(
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.align(Alignment.Center).padding(ScreenHorizontalMargin),
                 )
-                PersonUiState.Empty -> Text(
-                    text = "Nothing recorded about this person yet.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                is PersonUiState.Empty -> Column(
                     modifier = Modifier.align(Alignment.Center).padding(ScreenHorizontalMargin),
-                )
+                    verticalArrangement = Arrangement.spacedBy(SpacingSm),
+                ) {
+                    Text(
+                        text = "Nothing recorded about ${uiState.subject} yet.",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "Facts come from what you share: capture a conversation or notes that mention them, and what they said about their situation will be kept here — with the quote it came from.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 is PersonUiState.Ready -> PersonReadyContent(uiState.person, onSourceClick)
             }
         }
@@ -187,7 +196,7 @@ private fun PersonLoadingPreview() {
 @Preview(name = "Empty", showBackground = true)
 @Composable
 private fun PersonEmptyPreview() {
-    SecondBrainTheme { PersonScreen(PersonUiState.Empty, {}, {}) }
+    SecondBrainTheme { PersonScreen(PersonUiState.Empty("Sarah Tan"), {}, {}) }
 }
 
 @Preview(name = "Error", showBackground = true)

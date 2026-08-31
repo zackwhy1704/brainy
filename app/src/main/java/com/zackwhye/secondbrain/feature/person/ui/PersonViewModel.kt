@@ -29,7 +29,7 @@ class PersonViewModel @Inject constructor(
 
     val uiState: StateFlow<PersonUiState> = factRepository.observeFactsForSubject(subject)
         .map<List<Fact>, PersonUiState> { facts ->
-            if (facts.isEmpty()) PersonUiState.Empty else PersonUiState.Ready(facts.toPersonUiModel(subject))
+            if (facts.isEmpty()) PersonUiState.Empty(subject) else PersonUiState.Ready(facts.toPersonUiModel(subject))
         }
         .catch { emit(PersonUiState.Error(message = "Couldn't load this person.", retryable = true)) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersonUiState.Loading)

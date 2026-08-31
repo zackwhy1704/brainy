@@ -91,7 +91,7 @@ class PersonViewModelTest {
 
         viewModel.uiState.test {
             assertEquals(PersonUiState.Loading, awaitItem())
-            assertEquals(PersonUiState.Empty, awaitItem())
+            assertEquals(PersonUiState.Empty("Nobody"), awaitItem())
         }
     }
 
