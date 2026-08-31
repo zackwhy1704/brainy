@@ -33,26 +33,40 @@ interface ExtractedFact {
   value: string;
   quote: string;
   confidence?: number;
+  /** id of a KNOWN CURRENT FACT the model judged to be the same subject+category, or null. */
+  matches_fact_id?: string | null;
+  /** The model's judgment: does this materially differ from the matched fact? Restatement = false. */
+  changed?: boolean;
+}
+
+interface KnownFact {
+  id: string;
+  subject: string;
+  category: string;
+  value: string;
 }
 
 const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 const escapeLike = (s: string) => s.replace(/[%_\\]/g, (c) => `\\${c}`);
 
 /**
- * Versioned facts with provenance. For each extracted fact, look up the current (non-superseded)
- * fact for the same subject+category:
- *   - none        → insert
- *   - same value  → corroborate: link this item as an additional source, no new fact row
- *   - different   → insert the new fact and mark the old one superseded_by it (a recorded change)
- * Facts are never UPDATEd in place (DB trigger enforces it). Subject matching is case-insensitive
- * string equality only — no entity resolution; two spellings of one person diverge, by design for now.
- * Re-running extraction for the same item is a no-op for facts it already produced.
+ * Versioned facts with provenance. For each extracted fact, resolve the current (non-superseded)
+ * fact for the same subject+category — via the model's `matches_fact_id` when it named one that
+ * really exists for this user, else a case-insensitive string lookup — then:
+ *   - none                         → insert
+ *   - same (model says !changed,
+ *           or values normalize equal) → corroborate: link this item as an extra source, no new row
+ *   - different                    → insert the new fact and mark the old one superseded_by it
+ * Invariant kept either way: at most one current fact per (subject, category). Facts are never
+ * UPDATEd in place (DB trigger). Subject identity is string-match only — no entity resolution; two
+ * spellings of one person diverge, by design for now. Re-running for the same item is a no-op.
  */
 async function reconcileFacts(
   // deno-lint-ignore no-explicit-any
   service: any,
   item: ItemRow,
   raw: unknown,
+  knownById: Map<string, KnownFact>,
 ): Promise<{ inserted: number; corroborated: number; superseded: number; skipped: number }> {
   const counts = { inserted: 0, corroborated: 0, superseded: 0, skipped: 0 };
   if (!Array.isArray(raw)) return counts;
@@ -65,16 +79,22 @@ async function reconcileFacts(
     const subject = candidate.subject.trim();
     const value = candidate.value.trim();
 
-    const { data: current, error } = await service
+    // Only trust the model's match if it names a fact that exists for this user in the same
+    // category — the id came from the prompt, but a hallucinated or cross-category id must not
+    // supersede the wrong row.
+    const claimed = candidate.matches_fact_id ? knownById.get(candidate.matches_fact_id) : undefined;
+    const modelMatched = !!claimed && claimed.category === candidate.category &&
+      normalize(claimed.subject) === normalize(subject);
+
+    let query = service
       .from("facts")
       .select("id, value, source_item_id")
       .eq("user_id", item.user_id)
-      .ilike("subject", escapeLike(subject))
-      .eq("category", candidate.category)
-      .is("superseded_by", null)
-      .order("valid_from", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .is("superseded_by", null);
+    query = modelMatched
+      ? query.eq("id", claimed!.id)
+      : query.ilike("subject", escapeLike(subject)).eq("category", candidate.category).order("valid_from", { ascending: false });
+    const { data: current, error } = await query.limit(1).maybeSingle();
     if (error) throw new ExtractionError(`facts lookup failed: ${error.message}`);
 
     if (current?.source_item_id === item.id) {
@@ -82,7 +102,8 @@ async function reconcileFacts(
       continue;
     }
 
-    if (current && normalize(current.value) === normalize(value)) {
+    const restated = !!current && ((modelMatched && candidate.changed === false) || normalize(current.value) === normalize(value));
+    if (restated) {
       const { error: linkError } = await service
         .from("fact_sources")
         .upsert(
@@ -175,7 +196,31 @@ Deno.serve(async (req: Request) => {
     const content = await normalizeContent(item, service);
     const profile = resolveProfile(item.profile);
     const gateway = new AnthropicGateway(ANTHROPIC_API_KEY);
-    const result = await gateway.extract(content, profile);
+
+    // For fact-emitting profiles, hand the model the user's current facts so it can judge
+    // "same fact, reworded" vs. "changed" itself — normalized string equality never matches an
+    // LLM paraphrase, so without this every restatement looked like a change (seen on-device:
+    // "Based in Singapore" → "In Singapore for the foreseeable future" was recorded as a change).
+    // Capped at the 300 most recent current facts; subjects aren't known until after extraction.
+    let knownById = new Map<string, KnownFact>();
+    let context: string | undefined;
+    if ("facts" in profile.properties) {
+      const { data: known, error: knownError } = await service
+        .from("facts")
+        .select("id, subject, category, value")
+        .eq("user_id", item.user_id)
+        .is("superseded_by", null)
+        .order("valid_from", { ascending: false })
+        .limit(300);
+      if (knownError) throw new ExtractionError(`known facts lookup failed: ${knownError.message}`);
+      knownById = new Map((known as KnownFact[] ?? []).map((k) => [k.id, k]));
+      if (knownById.size > 0) {
+        context = "KNOWN CURRENT FACTS (id | subject | category | value):\n" +
+          [...knownById.values()].map((k) => `${k.id} | ${k.subject} | ${k.category} | ${k.value}`).join("\n");
+      }
+    }
+
+    const result = await gateway.extract(content, profile, context);
     const { base, attributes } = splitResult(result);
 
     const summary = typeof base.summary === "string" ? base.summary : "";
@@ -233,7 +278,7 @@ Deno.serve(async (req: Request) => {
     // facts failure must not flip an already-written ready brief to failed. Logged, not swallowed.
     let factCounts: Record<string, unknown>;
     try {
-      factCounts = await reconcileFacts(service, item, attributes.facts);
+      factCounts = await reconcileFacts(service, item, attributes.facts, knownById);
     } catch (factError) {
       const msg = factError instanceof Error ? factError.message : String(factError);
       console.error(`reconcileFacts failed for item ${item.id}: ${msg}`);
