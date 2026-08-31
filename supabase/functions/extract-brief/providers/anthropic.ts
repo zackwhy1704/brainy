@@ -48,9 +48,10 @@ export class AnthropicGateway implements LlmGateway {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1024,
-        // Extraction is a judgment we want repeatable, not creative. At the API default (1.0) the
-        // same/changed verdict on a reworded-identical fact flipped between runs (guard pair (b):
-        // 4/9 correct). 0 removes sampling noise from that verdict; content variety is irrelevant here.
+        // Extraction is a classification, not creative output, so 0 is the right default. It is
+        // NOT a fix for the same/changed verdict on reworded-identical facts: measured with
+        // supabase/tests/fact_diff_guard.py, pair (b) was 4/9 correct at 1.0 and 2/5 at 0. The
+        // verdict flips on byte-identical wording; the matched fact id is right every time.
         temperature: 0,
         tools: [tool],
         tool_choice: { type: "tool", name: TOOL_NAME },
