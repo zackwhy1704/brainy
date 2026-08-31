@@ -28,4 +28,8 @@ class FakeItemDao : ItemDao {
 
     override suspend fun getFailed(): List<ItemEntity> =
         items.value.values.filter { it.syncState == ItemSyncState.FAILED }
+
+    override suspend fun delete(id: String) {
+        items.value = items.value - id
+    }
 }

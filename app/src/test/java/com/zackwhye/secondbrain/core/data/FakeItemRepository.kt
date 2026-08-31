@@ -37,4 +37,17 @@ class FakeItemRepository : ItemRepository {
     override suspend fun retryFailedSyncs() {
         throw NotImplementedError("Not needed by current ViewModel tests")
     }
+
+    var deleteResult: Boolean = true
+    var deleteCallCount: Int = 0
+        private set
+    var lastDeletedId: String? = null
+        private set
+
+    override suspend fun deleteItem(id: String): Boolean {
+        deleteCallCount++
+        lastDeletedId = id
+        if (deleteResult) items.value = items.value.filterNot { it.id == id }
+        return deleteResult
+    }
 }

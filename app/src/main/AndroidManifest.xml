@@ -37,6 +37,35 @@
         </activity>
 
         <!--
+          Per-capture extraction profile selection with zero extra UI: a second share-sheet target.
+          Sharing to "Second Brain (person)" runs the same MainActivity capture path, but the
+          delivered intent's component names this alias, which MainActivity maps to the
+          "relationship" extraction profile (person-scoped facts). The plain "Second Brain" target
+          stays "general".
+        -->
+        <activity-alias
+            android:name=".PersonNoteShare"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:label="@string/share_target_person_note">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity-alias>
+
+        <!--
           OverlaySpikeService (Phase 1(d) Door 3 platform-risk spike) and the three permissions
           it alone needs (SYSTEM_ALERT_WINDOW, FOREGROUND_SERVICE_SPECIAL_USE, POST_NOTIFICATIONS
           — plus plain FOREGROUND_SERVICE, needed to start any foreground service and, like the

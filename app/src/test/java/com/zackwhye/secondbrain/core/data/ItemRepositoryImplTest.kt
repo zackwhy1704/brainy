@@ -33,9 +33,11 @@ class ItemRepositoryImplTest {
     private val fakeAuth = FakeAuthSessionManager()
     private val fakeItemsApi = FakeSupabaseItemsApi()
     private val fakeStorageApi = FakeSupabaseStorageApi()
+    private val fakeFactDao = FakeFactDao()
+    private val fakeBriefDao = FakeBriefDao()
 
     private fun repository(scope: kotlinx.coroutines.CoroutineScope) =
-        ItemRepositoryImpl(fakeDao, fakeAuth, fakeItemsApi, fakeStorageApi, scope)
+        ItemRepositoryImpl(fakeDao, fakeAuth, fakeItemsApi, fakeStorageApi, fakeFactDao, fakeBriefDao, scope)
 
     private val sampleContext = CapturedContext(
         door = SourceDoor.SHARE,
@@ -146,5 +148,97 @@ class ItemRepositoryImplTest {
         advanceUntilIdle()
 
         assertEquals(callsBeforeRetry, fakeItemsApi.callCount) // no re-sync of an already-SYNCED item
+    }
+
+    // ---- per-capture extraction profile ----
+
+    @Test
+    fun `capture syncs with the context's extraction profile, defaulting to general`() = runTest(UnconfinedTestDispatcher()) {
+        val repository = repository(scope = backgroundScope)
+
+        repository.saveCapturedItem(sampleContext) // default profile
+        advanceUntilIdle()
+        assertEquals("general", fakeItemsApi.lastInserted?.single()?.profile)
+
+        repository.saveCapturedItem(sampleContext.copy(extractionProfile = "relationship"))
+        advanceUntilIdle()
+        assertEquals("relationship", fakeItemsApi.lastInserted?.single()?.profile)
+    }
+
+    @Test
+    fun `retryFailedSyncs preserves the original capture's profile instead of downgrading it`() =
+        runTest(UnconfinedTestDispatcher()) {
+            fakeAuth.shouldFail = true
+            val repository = repository(scope = backgroundScope)
+            val id = repository.saveCapturedItem(sampleContext.copy(extractionProfile = "relationship"))
+            advanceUntilIdle()
+            assertEquals(ItemSyncState.FAILED, fakeDao.getById(id)?.syncState)
+
+            fakeAuth.shouldFail = false
+            repository.retryFailedSyncs()
+            advanceUntilIdle()
+
+            assertEquals(ItemSyncState.SYNCED, fakeDao.getById(id)?.syncState)
+            assertEquals("relationship", fakeItemsApi.lastInserted?.single()?.profile)
+        }
+
+    // ---- deleteItem ----
+
+    private fun fact(id: String, sourceItemId: String, supersededBy: String? = null) =
+        com.zackwhye.secondbrain.core.database.entity.FactEntity(
+            id = id, subject = "Sarah Tan", category = "location", value = "v-$id", quote = "q",
+            confidence = 0.9f, validFrom = 0L, supersededBy = supersededBy, sourceItemId = sourceItemId, createdAt = 0L,
+        )
+
+    @Test
+    fun `deleteItem on a synced item calls the cascade RPC, removes local rows, and restores superseded facts`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repository = repository(scope = backgroundScope)
+            val id = repository.saveCapturedItem(sampleContext)
+            advanceUntilIdle()
+            assertEquals(ItemSyncState.SYNCED, fakeDao.getById(id)?.syncState)
+            // f-old (another item) was superseded by f-new (this item): deleting the item must
+            // restore f-old as current — the exact local mirror of the server splice.
+            fakeFactDao.upsertAll(listOf(fact("f-new", sourceItemId = id), fact("f-old", sourceItemId = "other", supersededBy = "f-new")))
+
+            val deleted = repository.deleteItem(id)
+
+            assertEquals(true, deleted)
+            assertEquals(1, fakeItemsApi.deleteCallCount)
+            assertEquals(id, fakeItemsApi.lastDeletedItemId)
+            assertNull(fakeDao.getById(id))
+            val remaining = fakeFactDao.snapshot()
+            assertEquals(listOf("f-old"), remaining.map { it.id })
+            assertNull(remaining.single().supersededBy) // current again
+        }
+
+    @Test
+    fun `deleteItem returns false and removes nothing when the remote delete fails`() = runTest(UnconfinedTestDispatcher()) {
+        val repository = repository(scope = backgroundScope)
+        val id = repository.saveCapturedItem(sampleContext)
+        advanceUntilIdle()
+        fakeFactDao.upsertAll(listOf(fact("f1", sourceItemId = id)))
+        fakeItemsApi.deleteResponseCode = 500
+
+        val deleted = repository.deleteItem(id)
+
+        assertEquals(false, deleted)
+        assertEquals(ItemSyncState.SYNCED, fakeDao.getById(id)?.syncState) // still there
+        assertEquals(1, fakeFactDao.snapshot().size) // facts untouched
+    }
+
+    @Test
+    fun `deleteItem on a never-synced item deletes locally without any network call`() = runTest(UnconfinedTestDispatcher()) {
+        fakeAuth.shouldFail = true
+        val repository = repository(scope = backgroundScope)
+        val id = repository.saveCapturedItem(sampleContext)
+        advanceUntilIdle()
+        assertEquals(ItemSyncState.FAILED, fakeDao.getById(id)?.syncState)
+
+        val deleted = repository.deleteItem(id)
+
+        assertEquals(true, deleted)
+        assertEquals(0, fakeItemsApi.deleteCallCount)
+        assertNull(fakeDao.getById(id))
     }
 }

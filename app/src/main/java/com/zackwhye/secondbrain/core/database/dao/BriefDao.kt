@@ -18,4 +18,7 @@ interface BriefDao {
 
     @Query("SELECT * FROM briefs")
     fun observeAll(): Flow<List<BriefEntity>>
+
+    @Query("DELETE FROM briefs WHERE itemId = :itemId")
+    suspend fun deleteByItemId(itemId: String)
 }

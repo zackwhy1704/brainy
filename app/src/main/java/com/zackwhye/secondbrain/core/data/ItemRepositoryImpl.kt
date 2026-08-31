@@ -2,6 +2,8 @@ package com.zackwhye.secondbrain.core.data
 
 import android.util.Log
 import com.zackwhye.secondbrain.BuildConfig
+import com.zackwhye.secondbrain.core.database.dao.BriefDao
+import com.zackwhye.secondbrain.core.database.dao.FactDao
 import com.zackwhye.secondbrain.core.database.dao.ItemDao
 import com.zackwhye.secondbrain.core.database.entity.ItemEntity
 import com.zackwhye.secondbrain.core.database.entity.ItemSyncState
@@ -13,6 +15,7 @@ import com.zackwhye.secondbrain.core.network.AuthSessionManager
 import com.zackwhye.secondbrain.core.network.withAuthRetry
 import com.zackwhye.secondbrain.core.network.api.SupabaseItemsApi
 import com.zackwhye.secondbrain.core.network.api.SupabaseStorageApi
+import com.zackwhye.secondbrain.core.network.dto.DeleteItemCascadeRequest
 import com.zackwhye.secondbrain.core.network.dto.ItemDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +36,8 @@ class ItemRepositoryImpl @Inject constructor(
     private val authSessionManager: AuthSessionManager,
     private val itemsApi: SupabaseItemsApi,
     private val storageApi: SupabaseStorageApi,
+    private val factDao: FactDao,
+    private val briefDao: BriefDao,
     @ApplicationScope private val externalScope: CoroutineScope,
 ) : ItemRepository {
 
@@ -57,6 +62,7 @@ class ItemRepositoryImpl @Inject constructor(
             title = null,
             projectId = null,
             syncState = ItemSyncState.PENDING,
+            profile = context.extractionProfile,
             capturedAt = context.capturedAt.toEpochMilli(),
             createdAt = now.toEpochMilli(),
             updatedAt = now.toEpochMilli(),
@@ -75,6 +81,7 @@ class ItemRepositoryImpl @Inject constructor(
                 rawText = entity.rawText,
                 capturedAt = Instant.ofEpochMilli(entity.capturedAt),
                 mimeType = entity.recoveredMimeType(),
+                extractionProfile = entity.profile,
             )
             sync(entity.id, context)
         }
@@ -99,7 +106,7 @@ class ItemRepositoryImpl @Inject constructor(
                 sourceUri = remoteSourceUri,
                 rawText = context.rawText,
                 title = null,
-                profile = DEFAULT_EXTRACTION_PROFILE,
+                profile = context.extractionProfile,
                 capturedAt = DateTimeFormatter.ISO_INSTANT.format(context.capturedAt),
                 createdAt = isoNow,
                 updatedAt = isoNow,
@@ -138,16 +145,67 @@ class ItemRepositoryImpl @Inject constructor(
         return objectPath
     }
 
+    override suspend fun deleteItem(id: String): Boolean {
+        val entity = itemDao.getById(id) ?: return true // already gone
+
+        if (entity.syncState == ItemSyncState.SYNCED) {
+            // Remote-first: if the server still has the item, it must be gone there before we drop
+            // the local mirror — otherwise the item resurrects on the next facts/briefs poll.
+            try {
+                val response = authSessionManager.withAuthRetry { bearer ->
+                    itemsApi.deleteItemCascade(
+                        authorization = bearer,
+                        apiKey = BuildConfig.SUPABASE_ANON_KEY,
+                        body = DeleteItemCascadeRequest(itemId = id),
+                    )
+                }
+                if (!response.isSuccessful) throw HttpException(response)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "remote delete failed for item $id — keeping the item", e)
+                return false
+            }
+
+            // Storage object cleanup is best-effort: the DB row (and so the app-visible item) is
+            // already gone; an orphaned blob is a cost leak, not a correctness bug. Logged, not fatal.
+            if (entity.sourceType == ItemSourceType.IMAGE || entity.sourceType == ItemSourceType.PDF) {
+                entity.userId?.let { userId ->
+                    try {
+                        authSessionManager.withAuthRetry { bearer ->
+                            storageApi.delete(
+                                bucket = "captures",
+                                path = "$userId/$id",
+                                authorization = bearer,
+                                apiKey = BuildConfig.SUPABASE_ANON_KEY,
+                            )
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e(TAG, "storage delete failed for $userId/$id (orphaned object)", e)
+                    }
+                }
+            }
+        }
+
+        if (entity.sourceType == ItemSourceType.IMAGE || entity.sourceType == ItemSourceType.PDF) {
+            entity.sourceUri?.let { path -> File(path).delete() }
+        }
+
+        // Local mirror of the server's delete_item_cascade splice: any fact superseded by one of
+        // this item's facts is repointed to that fact's own superseder (null → current again).
+        factDao.getBySourceItem(id).forEach { fact ->
+            factDao.reassignSupersededBy(oldId = fact.id, newValue = fact.supersededBy)
+        }
+        factDao.deleteBySourceItem(id)
+        briefDao.deleteByItemId(id)
+        itemDao.delete(id)
+        return true
+    }
+
     private companion object {
         const val TAG = "ItemRepository"
-
-        /**
-         * Which Edge Function extraction profile every capture is sent with. "relationship" is a
-         * strict superset of "general" (same base fields + person-scoped `facts`), so briefs/Home are
-         * unaffected and facts simply come back empty for content with no people in it. One constant,
-         * not a UI: the cheapest way to make the versioned-facts gate reachable from a normal share.
-         */
-        const val DEFAULT_EXTRACTION_PROFILE = "relationship"
     }
 }
 

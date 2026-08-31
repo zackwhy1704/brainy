@@ -1,5 +1,6 @@
 package com.zackwhye.secondbrain.core.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.zackwhye.secondbrain.core.model.ItemSourceType
@@ -19,6 +20,9 @@ data class ItemEntity(
     val title: String?,
     val projectId: String?,
     val syncState: ItemSyncState,
+    /** Extraction profile the capture was (or will be, on retry) synced with — persisted so
+     * retryFailedSyncs doesn't silently downgrade a person-note share to "general". */
+    @ColumnInfo(defaultValue = "general") val profile: String = "general",
     val capturedAt: Long,
     val createdAt: Long,
     val updatedAt: Long,

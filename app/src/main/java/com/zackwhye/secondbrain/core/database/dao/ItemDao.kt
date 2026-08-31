@@ -27,4 +27,7 @@ interface ItemDao {
 
     @Query("SELECT * FROM items WHERE syncState = 'FAILED'")
     suspend fun getFailed(): List<ItemEntity>
+
+    @Query("DELETE FROM items WHERE id = :id")
+    suspend fun delete(id: String)
 }
