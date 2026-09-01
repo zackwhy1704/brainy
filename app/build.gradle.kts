@@ -70,6 +70,12 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    // The exported Room schema JSONs (ksp room.schemaLocation below) are what MigrationTestHelper
+    // opens to build a real v1 database on-device — they must ship inside the androidTest APK.
+    sourceSets {
+        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+    }
 }
 
 ksp {
@@ -112,4 +118,5 @@ dependencies {
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.room.testing) // MigrationTestHelper — instrumented migration test only
 }
